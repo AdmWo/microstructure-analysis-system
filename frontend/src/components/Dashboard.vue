@@ -2,6 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useWorkflowStore } from '../stores/workflow'
 import { analyzeImage } from '../api/analyze'
+import DashboardTopBar from './dashboard/DashboardTopBar.vue'
+import ScientificSidebar from './dashboard/ScientificSidebar.vue'
+import PipelineStepBar from './dashboard/PipelineStepBar.vue'
+import StitchViewer from './dashboard/StitchViewer.vue'
+import DashboardMetrics from './dashboard/DashboardMetrics.vue'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const workflow = useWorkflowStore()
@@ -18,6 +23,10 @@ const imageRender = reactive({ width: 0, height: 0 })
 const imageStats = reactive({ mean: null, stdDev: null, snr: null })
 const histogramBins = ref(Array.from({ length: 24 }, () => 0))
 const health = ref({ status: 'checking', message: 'Sprawdzanie polaczenia...' })
+const roiDraggingUi = ref(false)
+
+let savedDocUserSelect = ''
+let savedBodyUserSelect = ''
 const drawing = reactive({ active: false, x: 0, y: 0, width: 0, height: 0 })
 const view = reactive({
   zoom: 1,
@@ -178,17 +187,61 @@ function updateImageRenderSize() {
   }
 }
 
+function getRoiOverlayRect() {
+  const overlay = document.querySelector('.stitch-image-frame .roi-overlay')
+  return overlay?.getBoundingClientRect() ?? null
+}
+
 function clampToImageBounds(e) {
-  const target = e.target instanceof Element ? e.target : null
-  const current = e.currentTarget instanceof Element ? e.currentTarget : null
-  const overlay = target?.closest('.roi-overlay') || current?.closest('.roi-overlay') || current
-  const rect = overlay?.getBoundingClientRect()
-  if (!rect) return null
-  imageRender.width = rect.width
-  imageRender.height = rect.height
-  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
-  const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height))
-  return { x, y }
+  const rect = getRoiOverlayRect()
+  if (!rect || !rect.width || !rect.height) return null
+  const logicalW = imageRender.width
+  const logicalH = imageRender.height
+  if (!logicalW || !logicalH) return null
+  /** Po zoomie mapuj proporcjonalnie; gdy kursor jest poza prostokatem obrazu — przyklej do krawedzi overlay. */
+  const screenW = Math.max(rect.width, Number.EPSILON)
+  const screenH = Math.max(rect.height, Number.EPSILON)
+  const cx = Math.min(Math.max(e.clientX, rect.left), rect.right)
+  const cy = Math.min(Math.max(e.clientY, rect.top), rect.bottom)
+  const x = (cx - rect.left) * (logicalW / screenW)
+  const y = (cy - rect.top) * (logicalH / screenH)
+  return { x: Math.max(0, Math.min(x, logicalW)), y: Math.max(0, Math.min(y, logicalH)) }
+}
+
+let roiGlobalDragAttached = false
+
+function handleRoiGlobalMove(ev) {
+  if (view.panning || cropInteraction.active) ev.preventDefault()
+  moveRoiSelection(ev)
+}
+
+function handleRoiGlobalEnd() {
+  finishRoiSelection()
+}
+
+function attachRoiGlobalDragListeners() {
+  if (roiGlobalDragAttached) return
+  roiGlobalDragAttached = true
+  roiDraggingUi.value = true
+  savedDocUserSelect = document.documentElement.style.userSelect
+  savedBodyUserSelect = document.body.style.userSelect
+  document.documentElement.style.userSelect = 'none'
+  document.body.style.userSelect = 'none'
+  window.getSelection()?.removeAllRanges()
+  window.addEventListener('pointermove', handleRoiGlobalMove, { passive: false })
+  window.addEventListener('pointerup', handleRoiGlobalEnd, true)
+  window.addEventListener('pointercancel', handleRoiGlobalEnd, true)
+}
+
+function detachRoiGlobalDragListeners() {
+  if (!roiGlobalDragAttached) return
+  roiGlobalDragAttached = false
+  roiDraggingUi.value = false
+  document.documentElement.style.userSelect = savedDocUserSelect
+  document.body.style.userSelect = savedBodyUserSelect
+  window.removeEventListener('pointermove', handleRoiGlobalMove)
+  window.removeEventListener('pointerup', handleRoiGlobalEnd, true)
+  window.removeEventListener('pointercancel', handleRoiGlobalEnd, true)
 }
 
 function beginRoiSelection(e) {
@@ -197,6 +250,8 @@ function beginRoiSelection(e) {
     beginPan(e)
     return
   }
+  if (e.button !== 0) return
+  e.preventDefault()
   const point = clampToImageBounds(e)
   if (!point) return
   cropInteraction.active = true
@@ -210,10 +265,13 @@ function beginRoiSelection(e) {
   drawing.y = point.y
   drawing.width = 0
   drawing.height = 0
+  attachRoiGlobalDragListeners()
 }
 
 function beginMoveRoi(e) {
   if (workflow.currentStage !== 1 || !displayedRoiBox.value) return
+  if (e.button !== 0) return
+  e.preventDefault()
   e.stopPropagation()
   const point = clampToImageBounds(e)
   if (!point) return
@@ -222,10 +280,13 @@ function beginMoveRoi(e) {
   cropInteraction.startX = point.x
   cropInteraction.startY = point.y
   cropInteraction.originBox = { ...displayedRoiBox.value }
+  attachRoiGlobalDragListeners()
 }
 
 function beginResizeRoi(handle, e) {
   if (workflow.currentStage !== 1 || !displayedRoiBox.value) return
+  if (e.button !== 0) return
+  e.preventDefault()
   e.stopPropagation()
   const point = clampToImageBounds(e)
   if (!point) return
@@ -235,6 +296,7 @@ function beginResizeRoi(handle, e) {
   cropInteraction.startX = point.x
   cropInteraction.startY = point.y
   cropInteraction.originBox = { ...displayedRoiBox.value }
+  attachRoiGlobalDragListeners()
 }
 
 function applyDisplayBoxToRoi(box) {
@@ -259,6 +321,8 @@ function applyDisplayBoxToRoi(box) {
 }
 
 function beginPan(e) {
+  if (e.button !== undefined && e.button !== 0 && e.button !== 1) return
+  e.preventDefault()
   const point = clampToImageBounds(e)
   if (!point) return
   view.panning = true
@@ -266,6 +330,7 @@ function beginPan(e) {
   view.startY = e.clientY
   view.startOffsetX = view.offsetX
   view.startOffsetY = view.offsetY
+  attachRoiGlobalDragListeners()
 }
 
 function moveRoiSelection(e) {
@@ -313,29 +378,33 @@ function moveRoiSelection(e) {
 }
 
 function finishRoiSelection() {
-  if (view.panning) {
-    view.panning = false
-    return
-  }
-  if (!cropInteraction.active) return
-  if (cropInteraction.mode === 'new') {
-    if (drawing.width >= 8 && drawing.height >= 8 && imageNatural.width && imageNatural.height) {
-      applyDisplayBoxToRoi({
-        left: drawing.x,
-        top: drawing.y,
-        width: drawing.width,
-        height: drawing.height,
-      })
+  try {
+    if (view.panning) {
+      view.panning = false
+      return
     }
-    drawing.active = false
-    drawing.x = 0
-    drawing.y = 0
-    drawing.width = 0
-    drawing.height = 0
+    if (!cropInteraction.active) return
+    if (cropInteraction.mode === 'new') {
+      if (drawing.width >= 8 && drawing.height >= 8 && imageNatural.width && imageNatural.height) {
+        applyDisplayBoxToRoi({
+          left: drawing.x,
+          top: drawing.y,
+          width: drawing.width,
+          height: drawing.height,
+        })
+      }
+      drawing.active = false
+      drawing.x = 0
+      drawing.y = 0
+      drawing.width = 0
+      drawing.height = 0
+    }
+    cropInteraction.active = false
+    cropInteraction.handle = null
+    cropInteraction.originBox = null
+  } finally {
+    detachRoiGlobalDragListeners()
   }
-  cropInteraction.active = false
-  cropInteraction.handle = null
-  cropInteraction.originBox = null
 }
 
 function clearRoi() {
@@ -487,21 +556,6 @@ function onKeyUp(e) {
   if (e.code === 'Space') view.spacePressed = false
 }
 
-function updateManualRoi(manualRoi) {
-  if (!manualRoi || !imageNatural.width || !imageNatural.height) {
-    params.roi = null
-    return
-  }
-  const x = Math.max(0, Math.min(Math.round(manualRoi.x || 0), imageNatural.width - 1))
-  const y = Math.max(0, Math.min(Math.round(manualRoi.y || 0), imageNatural.height - 1))
-  params.roi = {
-    x,
-    y,
-    width: Math.max(1, Math.min(Math.round(manualRoi.width || 1), imageNatural.width - x)),
-    height: Math.max(1, Math.min(Math.round(manualRoi.height || 1), imageNatural.height - y)),
-  }
-}
-
 onMounted(() => {
   window.addEventListener('resize', updateImageRenderSize)
   window.addEventListener('keydown', onKeyDown)
@@ -515,6 +569,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateImageRenderSize)
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
+  detachRoiGlobalDragListeners()
 })
 
 watch(theme, (value) => {
@@ -557,164 +612,77 @@ async function runAnalysis() {
 </script>
 
 <template>
-  <div class="stitch-dashboard" :class="`theme-${theme}`">
-    <header class="stitch-topbar">
-      <div class="brand-wrap">
-        <span class="brand-title">System analizy mikrostruktury</span>
-      </div>
-      <div class="top-icons">
-        <button type="button" class="icon-btn" @click="toggleTheme">{{ theme === 'dark' ? 'Tryb jasny' : 'Tryb ciemny' }}</button>
-        <button type="button" class="icon-btn" @click="openHelp">Help (?)</button>
-      </div>
-    </header>
+  <div class="stitch-dashboard" :class="['theme-' + theme, { 'is-roi-dragging': roiDraggingUi }]">
+    <DashboardTopBar :theme="theme" @toggle-theme="toggleTheme" @open-help="openHelp" />
 
-    <aside class="stitch-side-nav">
-      <div class="tool-header">
-        <h3>Narzedzia naukowe</h3>
-        <p>Sterowanie instrumentem</p>
-      </div>
-      <div class="tool-list">
-        <button
-          v-for="tool in toolActions"
-          :key="tool"
-          type="button"
-          class="tool-button"
-          :class="{ active: activeTool === tool }"
-          @click="activateTool(tool)"
-        >
-          <span>{{ tool }}</span>
-        </button>
-      </div>
-
-      <div class="control-panel">
-        <label>
-          <span>Intensywnosc filtru medianowego</span>
-          <small>{{ params.denoise_kernel_size }} px</small>
-          <input v-model.number="params.denoise_kernel_size" type="range" min="1" max="15" step="1" />
-        </label>
-        <label>
-          <span>Kontrast podgladu</span>
-          <small>{{ contrastPercent }}%</small>
-          <input v-model.number="contrastPercent" type="range" min="60" max="180" step="5" />
-        </label>
-        <label>
-          <span>Prog binaryzacji</span>
-          <small>{{ params.manual_threshold }}</small>
-          <input v-model.number="params.manual_threshold" type="range" min="0" max="255" step="1" />
-        </label>
-        <label>
-          <span>Wybor modelu</span>
-          <select v-model="selectedModel">
-            <option value="DeepMetal-V4.2_ResNet">DeepMetal-V4.2_ResNet</option>
-            <option value="DeepMetal-V3.7_EfficientNet">DeepMetal-V3.7_EfficientNet</option>
-            <option value="GrainVision-Base">GrainVision-Base</option>
-          </select>
-        </label>
-        <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
-          <span class="material-symbols-outlined">play_arrow</span>
-          {{ loading ? 'Trwa analiza...' : 'Uruchom analize' }}
-        </button>
-      </div>
-    </aside>
+    <ScientificSidebar :tool-actions="toolActions" :active-tool="activeTool" @select-tool="activateTool">
+      <label>
+        <span>Intensywnosc filtru medianowego</span>
+        <small>{{ params.denoise_kernel_size }} px</small>
+        <input v-model.number="params.denoise_kernel_size" type="range" min="1" max="15" step="1" />
+      </label>
+      <label>
+        <span>Kontrast podgladu</span>
+        <small>{{ contrastPercent }}%</small>
+        <input v-model.number="contrastPercent" type="range" min="60" max="180" step="5" />
+      </label>
+      <label>
+        <span>Prog binaryzacji</span>
+        <small>{{ params.manual_threshold }}</small>
+        <input v-model.number="params.manual_threshold" type="range" min="0" max="255" step="1" />
+      </label>
+      <label>
+        <span>Wybor modelu</span>
+        <select v-model="selectedModel">
+          <option value="DeepMetal-V4.2_ResNet">DeepMetal-V4.2_ResNet</option>
+          <option value="DeepMetal-V3.7_EfficientNet">DeepMetal-V3.7_EfficientNet</option>
+          <option value="GrainVision-Base">GrainVision-Base</option>
+        </select>
+      </label>
+      <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
+        <span class="material-symbols-outlined">play_arrow</span>
+        {{ loading ? 'Trwa analiza...' : 'Uruchom analize' }}
+      </button>
+    </ScientificSidebar>
 
     <main class="stitch-main">
-      <div class="pipeline-stepper">
-        <button
-          v-for="step in pipelineSteps"
-          :key="step.id"
-          type="button"
-          class="pipeline-step"
-          :class="{ active: activePipelineStep === step.id, done: activePipelineStep > step.id }"
-          @click="goToPipelineStep(step.id)"
-        >
-          <div class="step-badge">{{ step.id }}</div>
-          <span>{{ step.label }}</span>
-        </button>
-      </div>
+      <PipelineStepBar :steps="pipelineSteps" :active-step="activePipelineStep" @step="goToPipelineStep" />
 
       <div class="content-row">
-        <section class="viewer-shell" @drop="onDrop" @dragover="onDragOver" @dragleave="onDragLeave">
-          <div class="viewer-overlay" v-if="!roiDataUrl">
-            <p>{{ isDragging ? 'Upusc obraz, aby rozpoczac analize' : 'Wgraj obraz mikroskopowy, aby zaczac' }}</p>
-            <button type="button" @click="openFilePicker">Wybierz obraz</button>
-            <p v-if="error" class="error-text">{{ error }}</p>
-          </div>
+        <StitchViewer
+          :roi-data-url="roiDataUrl"
+          :is-dragging="isDragging"
+          :error="error"
+          :frame-style="frameStyle"
+          :contrast-percent="contrastPercent"
+          :displayed-roi-box="displayedRoiBox"
+          :drawing="drawing"
+          :roi-meta="params.roi"
+          @drop="onDrop"
+          @dragover="onDragOver"
+          @dragleave="onDragLeave"
+          @wheel-image="onImageWheel"
+          @image-load="onImageLoaded"
+          @begin-roi="beginRoiSelection"
+          @begin-move-roi="beginMoveRoi"
+          @begin-resize-roi="beginResizeRoi"
+          @zoom-in="zoomIn"
+          @zoom-out="zoomOut"
+          @reset-view="resetView"
+          @clear-roi="clearRoi"
+          @open-file-picker="openFilePicker"
+        />
 
-          <div v-else class="stitch-image-frame-wrap" @wheel.prevent="onImageWheel">
-            <div class="stitch-image-frame" :style="frameStyle">
-              <img :src="roiDataUrl" alt="Mikrostruktura" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%)` }" @load="onImageLoaded" />
-              <div class="roi-overlay" @mousedown="beginRoiSelection" @mousemove="moveRoiSelection" @mouseup="finishRoiSelection" @mouseleave="finishRoiSelection">
-                <div
-                  v-if="displayedRoiBox"
-                  class="roi-box"
-                  :style="{ left: `${displayedRoiBox.left}px`, top: `${displayedRoiBox.top}px`, width: `${displayedRoiBox.width}px`, height: `${displayedRoiBox.height}px` }"
-                  @mousedown.stop="beginMoveRoi"
-                >
-                  <span
-                    v-for="handle in ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']"
-                    :key="handle"
-                    class="roi-handle"
-                    :class="`handle-${handle}`"
-                    @mousedown.stop="beginResizeRoi(handle, $event)"
-                  />
-                </div>
-                <div v-if="drawing.active || (drawing.width && drawing.height)" class="roi-box drawing" :style="{ left: `${drawing.x}px`, top: `${drawing.y}px`, width: `${drawing.width}px`, height: `${drawing.height}px` }" />
-              </div>
-            </div>
-          </div>
-
-          <div class="viewer-meta">
-            <div>MAG: 1000x</div>
-            <div>EHT: 20.00 kV</div>
-            <div>WD: 8.5 mm</div>
-            <div v-if="params.roi">ROI: {{ params.roi.x }}, {{ params.roi.y }} / {{ params.roi.width }}x{{ params.roi.height }}</div>
-          </div>
-          <div class="viewer-controls">
-            <button type="button" @click="zoomIn">+</button>
-            <button type="button" @click="zoomOut">-</button>
-            <button type="button" @click="resetView">Dopasuj</button>
-            <button type="button" @click="clearRoi">Wyczysc ROI</button>
-          </div>
-        </section>
-
-        <aside class="metrics-panel">
-          <section class="metric-card">
-            <h4>Histogram danych</h4>
-            <div class="bars">
-              <span v-for="(h, idx) in histogramBins" :key="idx" :style="{ height: `${h}%` }" />
-            </div>
-          </section>
-          <section class="metric-card">
-            <h4>Wyniki analizy</h4>
-            <div class="metric-row">
-              <span>A_A</span>
-              <strong>{{ aaPercent !== null ? `${aaPercent.toFixed(2)}%` : 'brak danych' }}</strong>
-            </div>
-            <div class="metric-row">
-              <span>V_V</span>
-              <strong>{{ vvPercent !== null ? `${vvPercent.toFixed(2)}%` : 'brak danych' }}</strong>
-            </div>
-            <div class="metric-row">
-              <span>Liczba porow</span>
-              <strong>{{ poreCount !== null ? poreCount : 'brak danych' }}</strong>
-            </div>
-          </section>
-          <section class="metric-card">
-            <div v-for="metric in metricCards" :key="metric.label" class="metric-row">
-              <span>{{ metric.label }}</span>
-              <strong>{{ metric.value }}</strong>
-            </div>
-          </section>
-          <section class="metric-card" v-if="maskDataUrl">
-            <h4>Maska segmentacji</h4>
-            <img :src="maskDataUrl" alt="Maska segmentacji" class="mask-image" />
-          </section>
-          <section class="metric-card status">
-            <span class="dot" />
-            {{ health.message }}
-            <button type="button" class="retry-health" @click="checkHealth">Odswiez</button>
-          </section>
-        </aside>
+        <DashboardMetrics
+          :histogram-bins="histogramBins"
+          :metric-cards="metricCards"
+          :aa-percent="aaPercent"
+          :vv-percent="vvPercent"
+          :pore-count="poreCount"
+          :mask-data-url="maskDataUrl"
+          :health-message="health.message"
+          @refresh-health="checkHealth"
+        />
       </div>
     </main>
 

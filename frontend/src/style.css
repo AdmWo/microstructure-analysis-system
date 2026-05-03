@@ -1403,8 +1403,18 @@ select {
 
 .stitch-dashboard .roi-overlay {
   cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 .stitch-dashboard .roi-box {
   cursor: move;
 }
+
+.stitch-dashboard.is-roi-dragging,
+.stitch-dashboard.is-roi-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
