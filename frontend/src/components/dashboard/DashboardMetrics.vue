@@ -2,9 +2,25 @@
   <aside class="metrics-panel">
     <section class="metric-card">
       <h4>Histogram danych</h4>
-      <div class="bars">
-        <span v-for="(h, idx) in histogramBins" :key="idx" :style="{ height: `${h}%` }" />
+      <div class="histogram-wrap">
+        <div class="bars">
+          <span v-for="(h, idx) in histogramBins" :key="idx" :style="{ height: `${h}%` }" />
+        </div>
+        <div
+          v-if="thresholdPercent !== null"
+          class="threshold-line"
+          :style="{ left: `${thresholdPercent}%` }"
+          :title="`Prog: ${thresholdValue}`"
+        />
       </div>
+      <div class="histogram-x-labels">
+        <span>0</span>
+        <span>64</span>
+        <span>128</span>
+        <span>192</span>
+        <span>255</span>
+      </div>
+      <p class="histogram-note">{{ histogramNote }}</p>
     </section>
 
     <section class="metric-card">
@@ -48,6 +64,9 @@ const emit = defineEmits(['refresh-health'])
 
 defineProps({
   histogramBins: { type: Array, required: true },
+  thresholdPercent: { type: Number, default: null },
+  thresholdValue: { type: Number, default: null },
+  histogramNote: { type: String, default: '' },
   metricCards: { type: Array, required: true },
   aaPercent: { type: Number, default: null },
   vvPercent: { type: Number, default: null },

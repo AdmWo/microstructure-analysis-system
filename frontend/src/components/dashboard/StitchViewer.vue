@@ -44,9 +44,6 @@
     </div>
 
     <div class="viewer-meta">
-      <div>MAG: 1000x</div>
-      <div>EHT: 20.00 kV</div>
-      <div>WD: 8.5 mm</div>
       <div v-if="roiMeta">ROI: {{ roiMeta.x }}, {{ roiMeta.y }} / {{ roiMeta.width }}x{{ roiMeta.height }}</div>
     </div>
     <div class="viewer-controls">

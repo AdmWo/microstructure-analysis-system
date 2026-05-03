@@ -923,6 +923,16 @@ select {
   gap: 6px;
 }
 
+.control-panel label.disabled {
+  opacity: 0.5;
+}
+
+.sidebar-stage-hint {
+  margin: 0 0 10px;
+  font: 500 11px/1.45 'Space Grotesk', sans-serif;
+  color: var(--text-soft);
+}
+
 .control-panel span {
   color: #e5e2e3;
   text-transform: uppercase;
@@ -1117,14 +1127,53 @@ select {
 .bars {
   height: 128px;
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(24, minmax(0, 1fr));
   align-items: end;
-  gap: 3px;
+  gap: 2px;
 }
 
 .bars span {
   display: block;
   background: rgba(0, 209, 255, 0.65);
+}
+
+.histogram-wrap {
+  position: relative;
+}
+
+.threshold-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+  background: #ffb4ab;
+  box-shadow: 0 0 0 1px rgba(255, 180, 171, 0.25);
+  pointer-events: none;
+}
+
+.histogram-x-labels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 6px;
+  color: var(--text-muted);
+  font: 500 10px/1.1 'Space Grotesk', sans-serif;
+}
+
+.histogram-x-labels span:nth-child(2),
+.histogram-x-labels span:nth-child(3),
+.histogram-x-labels span:nth-child(4) {
+  text-align: center;
+}
+
+.histogram-x-labels span:last-child {
+  text-align: right;
+}
+
+.histogram-note {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font: 500 10px/1.4 'Space Grotesk', sans-serif;
 }
 
 .metric-row {
@@ -1416,5 +1465,77 @@ select {
 .stitch-dashboard.is-roi-dragging * {
   user-select: none !important;
   -webkit-user-select: none !important;
+}
+
+@media (max-width: 1360px) {
+  .stitch-side-nav {
+    width: 288px;
+  }
+
+  .stitch-main {
+    margin-left: 288px;
+  }
+
+  .content-row {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 26vw);
+  }
+}
+
+@media (max-width: 1100px) {
+  .stitch-side-nav {
+    width: 250px;
+  }
+
+  .stitch-main {
+    margin-left: 250px;
+  }
+
+  .content-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metrics-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metrics-panel .status {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .stitch-dashboard {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    height: auto;
+  }
+
+  .stitch-side-nav {
+    position: static;
+    width: 100%;
+    max-height: 46vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--outline);
+    overflow: auto;
+  }
+
+  .stitch-main {
+    margin-left: 0;
+    margin-top: 0;
+    height: auto;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .pipeline-stepper {
+    height: auto;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .metrics-panel {
+    grid-template-columns: 1fr;
+  }
 }
 

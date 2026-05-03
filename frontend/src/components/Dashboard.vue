@@ -3,20 +3,45 @@
     <DashboardTopBar :theme="theme" @toggle-theme="toggleTheme" @open-help="openHelp" />
 
     <ScientificSidebar :tool-actions="toolActions" :active-tool="activeTool" @select-tool="activateTool">
+      <p class="sidebar-stage-hint">{{ stageHint }}</p>
       <label>
         <span>Intensywnosc filtru medianowego</span>
-        <small>{{ params.denoise_kernel_size }} px</small>
-        <input v-model.number="params.denoise_kernel_size" type="range" min="1" max="15" step="1" />
+        <small>{{ params.denoise_kernel_size }} px (OpenCV: nieparzyste >= 3)</small>
+        <input v-model.number="params.denoise_kernel_size" type="range" min="3" max="15" step="2" />
       </label>
       <label>
         <span>Kontrast podgladu</span>
-        <small>{{ contrastPercent }}%</small>
+        <small>{{ contrastPercent }}% (tylko ekran, nie wplywa na analize API)</small>
         <input v-model.number="contrastPercent" type="range" min="60" max="180" step="5" />
       </label>
       <label>
-        <span>Prog binaryzacji</span>
-        <small>{{ params.manual_threshold }}</small>
-        <input v-model.number="params.manual_threshold" type="range" min="0" max="255" step="1" />
+        <span>Metoda binaryzacji (API)</span>
+        <select v-model="params.binarization_method">
+          <option value="otsu">Otsu — automatyczny prog</option>
+          <option value="manual">Reczny prog</option>
+        </select>
+      </label>
+      <label :class="{ disabled: params.binarization_method !== 'manual' }">
+        <span>Prog binaryzacji (reczny)</span>
+        <small>{{ params.manual_threshold }} / 255</small>
+        <input
+          v-model.number="params.manual_threshold"
+          type="range"
+          min="0"
+          max="255"
+          step="1"
+          :disabled="params.binarization_method !== 'manual'"
+        />
+      </label>
+      <label>
+        <span>Morfologia — otwarcie (iteracje)</span>
+        <small>{{ params.morph_open_iterations }}</small>
+        <input v-model.number="params.morph_open_iterations" type="range" min="0" max="10" step="1" />
+      </label>
+      <label>
+        <span>Morfologia — domkniecie (iteracje)</span>
+        <small>{{ params.morph_close_iterations }}</small>
+        <input v-model.number="params.morph_close_iterations" type="range" min="0" max="10" step="1" />
       </label>
       <label>
         <span>Wybor modelu</span>
@@ -62,6 +87,9 @@
 
         <DashboardMetrics
           :histogram-bins="histogramBins"
+          :threshold-percent="histogramThresholdPercent"
+          :threshold-value="params.manual_threshold"
+          :histogram-note="histogramNote"
           :metric-cards="metricCards"
           :aa-percent="aaPercent"
           :vv-percent="vvPercent"
@@ -172,6 +200,13 @@ const metricCards = computed(() => ([
   { label: 'Odchylenie standardowe', value: imageStats.stdDev !== null ? `${imageStats.stdDev.toFixed(2)} AU` : 'brak danych' },
   { label: 'Stosunek sygnal/szum', value: imageStats.snr !== null ? `${imageStats.snr.toFixed(2)} dB` : 'brak danych' },
 ]))
+const histogramThresholdPercent = computed(() => (params.binarization_method === 'manual' ? (params.manual_threshold / 255) * 100 : null))
+const histogramNote = computed(() => {
+  if (!roiDataUrl.value) return 'Wgraj obraz, aby zobaczyc histogram ROI.'
+  return params.binarization_method === 'manual'
+    ? `Histogram liczony z aktualnego ROI. Marker pokazuje prog reczny = ${params.manual_threshold}.`
+    : 'Histogram liczony z aktualnego ROI. Prog Otsu jest wyliczany automatycznie przez API.'
+})
 const pipelineSteps = computed(() => ([
   { id: 1, label: 'Akwizycja obrazu' },
   { id: 2, label: 'ROI i przetwarzanie wstepne' },
@@ -182,11 +217,35 @@ const pipelineSteps = computed(() => ([
 const activePipelineStep = computed(() => {
   if (!file.value) return 1
   if (result.value) return 5
-  return Math.min(4, currentStage.value + 1)
+  return Math.min(5, currentStage.value + 1)
+})
+
+const stageHint = computed(() => {
+  switch (workflow.currentStage) {
+    case 1:
+      return 'Etap 1–2: ROI i przygotowanie. Rysuj / przesuwaj prostokat na obrazie; filtr i kontrast podgladu ponizej.'
+    case 2:
+      return 'Etap binaryzacji: wybierz Otsu lub reczny prog. Przy Otsu suwak progu jest wylaczony (API ignoruje go).'
+    case 3:
+      return 'Etap morfologii: otwarcie i domkniecie oczyszczaja maske przed liczeniem porow.'
+    case 4:
+      return 'Etap wynikow: kliknij Uruchom analize — wysylane sa wszystkie parametry (pelny pipeline, stage 4).'
+    default:
+      return ''
+  }
 })
 
 function goToPipelineStep(step) {
-  if (step === 1 || step === 2) workflow.goToStage(1)
+  if (step === 1) {
+    if (!file.value) openFilePicker()
+    else workflow.goToStage(1)
+    return
+  }
+  if (!file.value) {
+    error.value = 'Najpierw wgraj obraz, aby przejsc dalej w workflow.'
+    return
+  }
+  if (step === 2) workflow.goToStage(1)
   if (step === 3) workflow.goToStage(2)
   if (step === 4) workflow.goToStage(3)
   if (step === 5) workflow.goToStage(4)
@@ -522,7 +581,7 @@ function toggleTheme() {
 }
 
 function openHelp() {
-  window.alert('Pomoc: 1) Wgraj obraz, 2) Zaznacz ROI, 3) Ustaw parametry, 4) Kliknij "Uruchom analize".')
+  window.alert('Pomoc: 1) Wgraj obraz. 2) Etap 1–2: ROI i filtr (timeline lub narzedzia po lewej zmieniaja etap i opis ponizej). 3) Wybierz binaryzacje: Otsu lub Reczny prog. 4) Opcjonalnie morfologia. 5) Uruchom analize.')
 }
 
 function activateTool(tool) {
@@ -537,8 +596,12 @@ function activateTool(tool) {
     workflow.goToStage(2)
     params.binarization_method = 'manual'
   }
+  if (tool === 'Wybór modelu') workflow.goToStage(3)
   if (tool === 'Kontrast') workflow.goToStage(1)
-  if (tool === 'Eksport') exportAnalysis()
+  if (tool === 'Eksport') {
+    workflow.goToStage(4)
+    exportAnalysis()
+  }
 }
 
 async function checkHealth() {
@@ -596,7 +659,20 @@ function computeImageAnalytics() {
     if (!ctx) return
     ctx.filter = `contrast(${contrastPercent.value}%)`
     ctx.drawImage(image, 0, 0, width, height)
-    const pixels = ctx.getImageData(0, 0, width, height).data
+    let sx = 0
+    let sy = 0
+    let sw = width
+    let sh = height
+    if (params.roi && imageNatural.width > 0 && imageNatural.height > 0) {
+      const scaleX = width / imageNatural.width
+      const scaleY = height / imageNatural.height
+      sx = Math.max(0, Math.min(width - 1, Math.floor(params.roi.x * scaleX)))
+      sy = Math.max(0, Math.min(height - 1, Math.floor(params.roi.y * scaleY)))
+      sw = Math.max(1, Math.min(width - sx, Math.ceil(params.roi.width * scaleX)))
+      sh = Math.max(1, Math.min(height - sy, Math.ceil(params.roi.height * scaleY)))
+    }
+
+    const pixels = ctx.getImageData(sx, sy, sw, sh).data
     const bins = Array.from({ length: 24 }, () => 0)
     let sum = 0
     let sumSq = 0
@@ -660,6 +736,14 @@ watch(roiDataUrl, () => {
 })
 
 watch(contrastPercent, () => {
+  computeImageAnalytics()
+})
+
+watch(() => params.roi, () => {
+  computeImageAnalytics()
+}, { deep: true })
+
+watch(() => params.manual_threshold, () => {
   computeImageAnalytics()
 })
 
