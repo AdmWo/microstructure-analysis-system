@@ -6,8 +6,8 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 /**
  * @param {File} file - Image file (PNG, JPEG, etc.)
- * @param {Object} params - Workflow parameters for all scientific stages.
- * @returns {Promise<{ original_b64: string, roi_b64: string, mask_b64: string, pore_count: number, aa_percent: number, vv_percent: number }>}
+ * @param {Object} params - Workflow parameters for all scientific stages (including ROI/invert/progowanie/morfologia).
+ * @returns {Promise<{ original_b64: string, roi_b64: string, mask_b64: string, pore_count: number, aa_percent: number }>}
  */
 export async function analyzeImage(file, params) {
   const formData = new FormData()

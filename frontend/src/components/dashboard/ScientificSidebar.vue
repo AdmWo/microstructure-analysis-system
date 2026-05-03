@@ -4,6 +4,12 @@
       <h3>Narzedzia naukowe</h3>
       <p>Sterowanie instrumentem</p>
     </div>
+    <label class="compact-tool-select-wrap" for="tool-select">
+      <span>Narzędzie</span>
+      <select id="tool-select" class="compact-tool-select" :value="activeTool" @change="emit('select-tool', $event.target.value)">
+        <option v-for="tool in toolActions" :key="tool" :value="tool">{{ tool }}</option>
+      </select>
+    </label>
     <div class="tool-list">
       <button
         v-for="tool in toolActions"

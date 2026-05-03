@@ -30,10 +30,6 @@
         <strong>{{ aaPercent !== null ? `${aaPercent.toFixed(2)}%` : 'brak danych' }}</strong>
       </div>
       <div class="metric-row">
-        <span>V_V</span>
-        <strong>{{ vvPercent !== null ? `${vvPercent.toFixed(2)}%` : 'brak danych' }}</strong>
-      </div>
-      <div class="metric-row">
         <span>Liczba porow</span>
         <strong>{{ poreCount !== null ? poreCount : 'brak danych' }}</strong>
       </div>
@@ -69,7 +65,6 @@ defineProps({
   histogramNote: { type: String, default: '' },
   metricCards: { type: Array, required: true },
   aaPercent: { type: Number, default: null },
-  vvPercent: { type: Number, default: null },
   poreCount: { type: Number, default: null },
   maskDataUrl: { type: String, default: null },
   healthMessage: { type: String, required: true },

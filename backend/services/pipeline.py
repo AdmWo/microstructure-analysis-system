@@ -82,7 +82,10 @@ def encode_image_b64(img: np.ndarray, fmt: str = ".png") -> str:
 def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, np.ndarray, int, float, float]:
     """Execute the staged scientific workflow and return ROI/mask/stats."""
     roi_img = crop_roi(img, params.roi)
+    if params.invert_roi:
+        roi_img = cv2.bitwise_not(roi_img)
     gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.convertScaleAbs(gray, alpha=max(0.01, params.contrast_percent / 100.0), beta=0)
     preprocessed = apply_denoise(gray, params)
 
     if params.stage >= 2:

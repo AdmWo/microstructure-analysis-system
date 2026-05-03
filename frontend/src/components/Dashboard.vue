@@ -4,55 +4,84 @@
 
     <ScientificSidebar :tool-actions="toolActions" :active-tool="activeTool" @select-tool="activateTool">
       <p class="sidebar-stage-hint">{{ stageHint }}</p>
-      <label>
-        <span>Intensywnosc filtru medianowego</span>
-        <small>{{ params.denoise_kernel_size }} px (OpenCV: nieparzyste >= 3)</small>
-        <input v-model.number="params.denoise_kernel_size" type="range" min="3" max="15" step="2" />
-      </label>
-      <label>
-        <span>Kontrast podgladu</span>
-        <small>{{ contrastPercent }}% (tylko ekran, nie wplywa na analize API)</small>
-        <input v-model.number="contrastPercent" type="range" min="60" max="180" step="5" />
-      </label>
-      <label>
-        <span>Metoda binaryzacji (API)</span>
-        <select v-model="params.binarization_method">
-          <option value="otsu">Otsu — automatyczny prog</option>
-          <option value="manual">Reczny prog</option>
-        </select>
-      </label>
-      <label :class="{ disabled: params.binarization_method !== 'manual' }">
-        <span>Prog binaryzacji (reczny)</span>
-        <small>{{ params.manual_threshold }} / 255</small>
-        <input
-          v-model.number="params.manual_threshold"
-          type="range"
-          min="0"
-          max="255"
-          step="1"
-          :disabled="params.binarization_method !== 'manual'"
-        />
-      </label>
-      <label>
-        <span>Morfologia — otwarcie (iteracje)</span>
-        <small>{{ params.morph_open_iterations }}</small>
-        <input v-model.number="params.morph_open_iterations" type="range" min="0" max="10" step="1" />
-      </label>
-      <label>
-        <span>Morfologia — domkniecie (iteracje)</span>
-        <small>{{ params.morph_close_iterations }}</small>
-        <input v-model.number="params.morph_close_iterations" type="range" min="0" max="10" step="1" />
-      </label>
-      <label>
-        <span>Wybor modelu</span>
-        <select v-model="selectedModel">
-          <option value="DeepMetal-V4.2_ResNet">DeepMetal-V4.2_ResNet</option>
-          <option value="DeepMetal-V3.7_EfficientNet">DeepMetal-V3.7_EfficientNet</option>
-          <option value="GrainVision-Base">GrainVision-Base</option>
-        </select>
-      </label>
+      <template v-if="currentStage === 1">
+        <button type="button" class="mini-btn" @click="openFilePicker">Wgraj nowy obraz</button>
+        <label>
+          <span>Kontrast analizy (API + podglad)</span>
+          <small>{{ params.contrast_percent }}%</small>
+          <input v-model.number="params.contrast_percent" type="range" min="50" max="200" step="5" />
+        </label>
+        <label>
+          <span>Intensywnosc filtru medianowego</span>
+          <small>{{ params.denoise_kernel_size }} px (OpenCV: nieparzyste >= 3)</small>
+          <input v-model.number="params.denoise_kernel_size" type="range" min="3" max="15" step="2" />
+        </label>
+        <label>
+          <span>ROI X / Y / W / H</span>
+          <div class="roi-inline-grid">
+            <input type="number" min="0" :disabled="!params.roi" :value="params.roi?.x ?? 0" @change="updateManualRoiField({ field: 'x', value: Number($event.target.value || 0) })" />
+            <input type="number" min="0" :disabled="!params.roi" :value="params.roi?.y ?? 0" @change="updateManualRoiField({ field: 'y', value: Number($event.target.value || 0) })" />
+            <input type="number" min="1" :disabled="!params.roi" :value="params.roi?.width ?? 1" @change="updateManualRoiField({ field: 'width', value: Number($event.target.value || 1) })" />
+            <input type="number" min="1" :disabled="!params.roi" :value="params.roi?.height ?? 1" @change="updateManualRoiField({ field: 'height', value: Number($event.target.value || 1) })" />
+          </div>
+          <button type="button" class="mini-btn" @click="setRoiToFullImage">ROI = caly obraz</button>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" v-model="params.invert_roi" />
+          <span>Inwertuj ROI (wplywa na API)</span>
+        </label>
+      </template>
+
+      <template v-else-if="currentStage === 2">
+        <label>
+          <span>Metoda binaryzacji (API)</span>
+          <select id="binarization-method" name="binarization_method" v-model="params.binarization_method">
+            <option value="otsu">Otsu — automatyczny prog</option>
+            <option value="manual">Reczny prog</option>
+          </select>
+        </label>
+        <label :class="{ disabled: params.binarization_method !== 'manual' }">
+          <span>Prog binaryzacji (reczny)</span>
+          <small>{{ params.manual_threshold }} / 255</small>
+          <input
+            v-model.number="params.manual_threshold"
+            type="range"
+            min="0"
+            max="255"
+            step="1"
+            :disabled="params.binarization_method !== 'manual'"
+          />
+        </label>
+      </template>
+
+      <template v-else-if="currentStage === 3">
+        <label>
+          <span>Morfologia — otwarcie (iteracje)</span>
+          <small>{{ params.morph_open_iterations }}</small>
+          <input v-model.number="params.morph_open_iterations" type="range" min="0" max="10" step="1" />
+        </label>
+        <label>
+          <span>Morfologia — domkniecie (iteracje)</span>
+          <small>{{ params.morph_close_iterations }}</small>
+          <input v-model.number="params.morph_close_iterations" type="range" min="0" max="10" step="1" />
+        </label>
+        <label>
+          <span>Wybor modelu (roboczo)</span>
+          <select id="model-selection" name="model_selection" v-model="selectedModel">
+            <option value="DeepMetal-V4.2_ResNet">DeepMetal-V4.2_ResNet</option>
+            <option value="DeepMetal-V3.7_EfficientNet">DeepMetal-V3.7_EfficientNet</option>
+            <option value="GrainVision-Base">GrainVision-Base</option>
+          </select>
+        </label>
+      </template>
+
+      <template v-else>
+        <p class="sidebar-stage-hint">Wyniki gotowe do przegladu i eksportu. W razie potrzeby wroc do poprzednich etapow timeline.</p>
+      </template>
       <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
-        <span class="material-symbols-outlined">play_arrow</span>
+        <svg class="execute-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5v14l11-7z" fill="currentColor" />
+        </svg>
         {{ loading ? 'Trwa analiza...' : 'Uruchom analize' }}
       </button>
     </ScientificSidebar>
@@ -66,10 +95,11 @@
           :is-dragging="isDragging"
           :error="error"
           :frame-style="frameStyle"
-          :contrast-percent="contrastPercent"
+          :contrast-percent="params.contrast_percent"
+          :invert-roi="params.invert_roi"
+          :can-edit-roi="currentStage === 1"
           :displayed-roi-box="displayedRoiBox"
           :drawing="drawing"
-          :roi-meta="params.roi"
           @drop="onDrop"
           @dragover="onDragOver"
           @dragleave="onDragLeave"
@@ -92,7 +122,6 @@
           :histogram-note="histogramNote"
           :metric-cards="metricCards"
           :aa-percent="aaPercent"
-          :vv-percent="vvPercent"
           :pore-count="poreCount"
           :mask-data-url="maskDataUrl"
           :health-message="health.message"
@@ -102,6 +131,22 @@
     </main>
 
     <input ref="fileInputRef" type="file" accept="image/*" @change="onFileInput" />
+
+    <div v-if="helpOpen" class="help-modal-backdrop" @click.self="closeHelp">
+      <section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <header class="help-modal-header">
+          <h2 id="help-title">Pomoc</h2>
+          <button type="button" class="help-close-btn" @click="closeHelp" aria-label="Zamknij pomoc">×</button>
+        </header>
+        <div class="help-modal-content">
+          <p>1) Wgraj obraz.</p>
+          <p>2) Ustaw ROI i parametry przetwarzania.</p>
+          <p>3) Wybierz binaryzacje i uruchom analize.</p>
+          <p>4) Maska wynikowa pokazuje pory jako obszary jasne, a material jako ciemny.</p>
+          <p>5) Timeline u gory zmienia etap pracy, a panel po lewej pokazuje sterowanie dla aktualnego etapu.</p>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -121,7 +166,7 @@ const file = ref(null)
 const result = ref(null)
 const error = ref(null)
 const loading = ref(false)
-const theme = ref('dark')
+const theme = ref('light')
 const isDragging = ref(false)
 const localPreview = ref(null)
 const fileInputRef = ref(null)
@@ -131,6 +176,7 @@ const imageStats = reactive({ mean: null, stdDev: null, snr: null })
 const histogramBins = ref(Array.from({ length: 24 }, () => 0))
 const health = ref({ status: 'checking', message: 'Sprawdzanie polaczenia...' })
 const roiDraggingUi = ref(false)
+const helpOpen = ref(false)
 
 let savedDocUserSelect = ''
 let savedBodyUserSelect = ''
@@ -157,6 +203,8 @@ const cropInteraction = reactive({
 
 const params = reactive({
   roi: null,
+  invert_roi: false,
+  contrast_percent: 100,
   denoise_enabled: true,
   denoise_method: 'median',
   denoise_kernel_size: 5,
@@ -168,13 +216,11 @@ const params = reactive({
 const selectedModel = ref('DeepMetal-V4.2_ResNet')
 const toolActions = ['Przytnij ROI', 'Filtr medianowy', 'Wybór modelu', 'Progowanie', 'Kontrast', 'Eksport']
 const activeTool = ref('Przytnij ROI')
-const contrastPercent = ref(100)
 
 const currentStage = computed(() => workflow.currentStage)
 const maskDataUrl = computed(() => result.value?.mask_b64 ? `data:image/png;base64,${result.value.mask_b64}` : null)
 const roiDataUrl = computed(() => localPreview.value)
 const aaPercent = computed(() => result.value?.aa_percent ?? null)
-const vvPercent = computed(() => result.value?.vv_percent ?? null)
 const poreCount = computed(() => result.value?.pore_count ?? null)
 const displayedRoiBox = computed(() => {
   if (!params.roi || !imageNatural.width || !imageNatural.height || !imageRender.width || !imageRender.height) return null
@@ -216,20 +262,19 @@ const pipelineSteps = computed(() => ([
 ]))
 const activePipelineStep = computed(() => {
   if (!file.value) return 1
-  if (result.value) return 5
   return Math.min(5, currentStage.value + 1)
 })
 
 const stageHint = computed(() => {
   switch (workflow.currentStage) {
     case 1:
-      return 'Etap 1–2: ROI i przygotowanie. Rysuj / przesuwaj prostokat na obrazie; filtr i kontrast podgladu ponizej.'
+      return 'Etap przygotowania: ustaw ROI, inwersje i kontrast. Tool-list sluzy do szybkich presetow, a timeline do przechodzenia etapow.'
     case 2:
-      return 'Etap binaryzacji: wybierz Otsu lub reczny prog. Przy Otsu suwak progu jest wylaczony (API ignoruje go).'
+      return 'Etap binaryzacji: wybierz Otsu lub reczny prog. Timeline steruje etapem, tool-list nie zmienia etapu.'
     case 3:
       return 'Etap morfologii: otwarcie i domkniecie oczyszczaja maske przed liczeniem porow.'
     case 4:
-      return 'Etap wynikow: kliknij Uruchom analize — wysylane sa wszystkie parametry (pelny pipeline, stage 4).'
+      return 'Etap wynikow: uruchom analize i porownaj metryki/maski. Eksport zapisze aktualne parametry.'
     default:
       return ''
   }
@@ -249,6 +294,11 @@ function goToPipelineStep(step) {
   if (step === 3) workflow.goToStage(2)
   if (step === 4) workflow.goToStage(3)
   if (step === 5) workflow.goToStage(4)
+}
+
+function setRoiToFullImage() {
+  if (!imageNatural.width || !imageNatural.height) return
+  params.roi = { x: 0, y: 0, width: imageNatural.width, height: imageNatural.height }
 }
 
 function onDrop(e) {
@@ -383,12 +433,20 @@ function detachRoiGlobalDragListeners() {
 }
 
 function beginRoiSelection(e) {
-  if (workflow.currentStage !== 1 || !file.value) return
+  if (!file.value) return
   if (view.spacePressed || e.button === 1) {
     beginPan(e)
     return
   }
   if (e.button !== 0) return
+  if (workflow.currentStage !== 1) {
+    if (view.zoom > 1) beginPan(e)
+    return
+  }
+  if (view.zoom > 1 && params.roi) {
+    beginPan(e)
+    return
+  }
   e.preventDefault()
   const point = clampToImageBounds(e)
   if (!point) return
@@ -554,6 +612,24 @@ function clearRoi() {
   drawing.height = 0
 }
 
+function updateManualRoiField({ field, value }) {
+  if (!params.roi || !imageNatural.width || !imageNatural.height) return
+  const next = { ...params.roi }
+  if (field === 'x' || field === 'y') {
+    next[field] = Math.max(0, Math.round(value))
+  } else if (field === 'width' || field === 'height') {
+    next[field] = Math.max(1, Math.round(value))
+  }
+  const x = Math.max(0, Math.min(next.x, imageNatural.width - 1))
+  const y = Math.max(0, Math.min(next.y, imageNatural.height - 1))
+  params.roi = {
+    x,
+    y,
+    width: Math.max(1, Math.min(next.width, imageNatural.width - x)),
+    height: Math.max(1, Math.min(next.height, imageNatural.height - y)),
+  }
+}
+
 function zoomIn() {
   view.zoom = Math.min(5, +(view.zoom + 0.2).toFixed(2))
   nextTick(updateImageRenderSize)
@@ -581,25 +657,29 @@ function toggleTheme() {
 }
 
 function openHelp() {
-  window.alert('Pomoc: 1) Wgraj obraz. 2) Etap 1–2: ROI i filtr (timeline lub narzedzia po lewej zmieniaja etap i opis ponizej). 3) Wybierz binaryzacje: Otsu lub Reczny prog. 4) Opcjonalnie morfologia. 5) Uruchom analize.')
+  helpOpen.value = true
+}
+
+function closeHelp() {
+  helpOpen.value = false
 }
 
 function activateTool(tool) {
   activeTool.value = tool
-  if (tool === 'Przytnij ROI') workflow.goToStage(1)
+  if (tool === 'Przytnij ROI') return
   if (tool === 'Filtr medianowy') {
-    workflow.goToStage(1)
     params.denoise_enabled = true
     params.denoise_method = 'median'
   }
   if (tool === 'Progowanie') {
-    workflow.goToStage(2)
     params.binarization_method = 'manual'
+    params.manual_threshold = Math.max(0, Math.min(255, params.manual_threshold))
   }
-  if (tool === 'Wybór modelu') workflow.goToStage(3)
-  if (tool === 'Kontrast') workflow.goToStage(1)
+  if (tool === 'Wybór modelu') return
+  if (tool === 'Kontrast') {
+    params.contrast_percent = Math.max(50, Math.min(200, params.contrast_percent))
+  }
   if (tool === 'Eksport') {
-    workflow.goToStage(4)
     exportAnalysis()
   }
 }
@@ -623,10 +703,9 @@ function exportAnalysis() {
   }
   const payload = {
     model: selectedModel.value,
-    params: { ...params, contrast_percent: contrastPercent.value },
+      params: { ...params },
     metrics: {
       aa_percent: result.value.aa_percent,
-      vv_percent: result.value.vv_percent,
       pore_count: result.value.pore_count,
     },
     generated_at: new Date().toISOString(),
@@ -657,7 +736,8 @@ function computeImageAnalytics() {
     canvas.height = height
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    ctx.filter = `contrast(${contrastPercent.value}%)`
+    const invertPart = params.invert_roi ? ' invert(100%)' : ''
+    ctx.filter = `contrast(${params.contrast_percent}%)${invertPart}`
     ctx.drawImage(image, 0, 0, width, height)
     let sx = 0
     let sy = 0
@@ -735,7 +815,7 @@ watch(roiDataUrl, () => {
   computeImageAnalytics()
 })
 
-watch(contrastPercent, () => {
+watch(() => params.contrast_percent, () => {
   computeImageAnalytics()
 })
 
@@ -744,6 +824,10 @@ watch(() => params.roi, () => {
 }, { deep: true })
 
 watch(() => params.manual_threshold, () => {
+  computeImageAnalytics()
+})
+
+watch(() => params.invert_roi, () => {
   computeImageAnalytics()
 })
 

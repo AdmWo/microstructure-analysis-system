@@ -23,6 +23,8 @@ class RoiSelection(BaseModel):
 class AnalysisParams(BaseModel):
     stage: int = Field(default=4, ge=1, le=4)
     roi: RoiSelection | None = None
+    invert_roi: bool = False
+    contrast_percent: int = Field(default=100, ge=50, le=200)
     denoise_enabled: bool = True
     denoise_method: str = Field(default="median", pattern="^(median|gaussian)$")
     denoise_kernel_size: int = Field(default=5, ge=3, le=31)

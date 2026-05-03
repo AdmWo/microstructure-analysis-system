@@ -13,9 +13,12 @@
           alt="Mikrostruktura"
           class="main-image"
           draggable="false"
-          :style="{ filter: `contrast(${contrastPercent}%)` }"
+          :style="{ filter: baseImageFilter }"
           @load="emit('image-load', $event)"
         />
+        <div v-if="invertRoi && displayedRoiBox" class="roi-live-invert-layer" :style="roiInvertClipStyle">
+          <img :src="roiDataUrl" alt="" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%) invert(100%)` }" aria-hidden="true" />
+        </div>
         <div
           class="roi-overlay"
           @mousedown="emit('begin-roi', $event)"
@@ -27,6 +30,7 @@
             @mousedown.stop="emit('begin-move-roi', $event)"
           >
             <span
+              v-if="canEditRoi"
               v-for="handle in HANDLES"
               :key="handle"
               class="roi-handle"
@@ -43,9 +47,6 @@
       </div>
     </div>
 
-    <div class="viewer-meta">
-      <div v-if="roiMeta">ROI: {{ roiMeta.x }}, {{ roiMeta.y }} / {{ roiMeta.width }}x{{ roiMeta.height }}</div>
-    </div>
     <div class="viewer-controls">
       <button type="button" @click="emit('zoom-in')">+</button>
       <button type="button" @click="emit('zoom-out')">-</button>
@@ -56,17 +57,20 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
-defineProps({
+const props = defineProps({
   roiDataUrl: { type: String, default: null },
   isDragging: { type: Boolean, default: false },
   error: { type: String, default: null },
   frameStyle: { type: Object, required: true },
   contrastPercent: { type: Number, required: true },
+  invertRoi: { type: Boolean, default: false },
+  canEditRoi: { type: Boolean, default: false },
   displayedRoiBox: { type: Object, default: null },
   drawing: { type: Object, required: true },
-  roiMeta: { type: Object, default: null },
 })
 
 const emit = defineEmits([
@@ -84,4 +88,19 @@ const emit = defineEmits([
   'clear-roi',
   'open-file-picker',
 ])
+
+const roiInvertClipStyle = computed(() => {
+  if (!props.displayedRoiBox) return null
+  const { left, top, width, height } = props.displayedRoiBox
+  const rightInset = `calc(100% - ${left + width}px)`
+  const bottomInset = `calc(100% - ${top + height}px)`
+  return {
+    clipPath: `inset(${top}px ${rightInset} ${bottomInset} ${left}px)`,
+  }
+})
+
+const baseImageFilter = computed(() => {
+  const shouldInvertWholeImage = props.invertRoi && !props.displayedRoiBox
+  return `contrast(${props.contrastPercent}%)${shouldInvertWholeImage ? ' invert(100%)' : ''}`
+})
 </script>
