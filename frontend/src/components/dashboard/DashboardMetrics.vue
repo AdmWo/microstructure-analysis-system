@@ -1,17 +1,3 @@
-<script setup>
-const emit = defineEmits(['refresh-health'])
-
-defineProps({
-  histogramBins: { type: Array, required: true },
-  metricCards: { type: Array, required: true },
-  aaPercent: { type: Number, default: null },
-  vvPercent: { type: Number, default: null },
-  poreCount: { type: Number, default: null },
-  maskDataUrl: { type: String, default: null },
-  healthMessage: { type: String, required: true },
-})
-</script>
-
 <template>
   <aside class="metrics-panel">
     <section class="metric-card">
@@ -56,3 +42,17 @@ defineProps({
     </section>
   </aside>
 </template>
+
+<script setup>
+const emit = defineEmits(['refresh-health'])
+
+defineProps({
+  histogramBins: { type: Array, required: true },
+  metricCards: { type: Array, required: true },
+  aaPercent: { type: Number, default: null },
+  vvPercent: { type: Number, default: null },
+  poreCount: { type: Number, default: null },
+  maskDataUrl: { type: String, default: null },
+  healthMessage: { type: String, required: true },
+})
+</script>

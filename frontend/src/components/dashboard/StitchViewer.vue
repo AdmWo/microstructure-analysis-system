@@ -1,34 +1,3 @@
-<script setup>
-const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-
-defineProps({
-  roiDataUrl: { type: String, default: null },
-  isDragging: { type: Boolean, default: false },
-  error: { type: String, default: null },
-  frameStyle: { type: Object, required: true },
-  contrastPercent: { type: Number, required: true },
-  displayedRoiBox: { type: Object, default: null },
-  drawing: { type: Object, required: true },
-  roiMeta: { type: Object, default: null },
-})
-
-const emit = defineEmits([
-  'drop',
-  'dragover',
-  'dragleave',
-  'wheel-image',
-  'image-load',
-  'begin-roi',
-  'begin-move-roi',
-  'begin-resize-roi',
-  'zoom-in',
-  'zoom-out',
-  'reset-view',
-  'clear-roi',
-  'open-file-picker',
-])
-</script>
-
 <template>
   <section class="viewer-shell" @drop="emit('drop', $event)" @dragover="emit('dragover', $event)" @dragleave="emit('dragleave')">
     <div v-if="!roiDataUrl" class="viewer-overlay">
@@ -88,3 +57,34 @@ const emit = defineEmits([
     </div>
   </section>
 </template>
+
+<script setup>
+const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
+defineProps({
+  roiDataUrl: { type: String, default: null },
+  isDragging: { type: Boolean, default: false },
+  error: { type: String, default: null },
+  frameStyle: { type: Object, required: true },
+  contrastPercent: { type: Number, required: true },
+  displayedRoiBox: { type: Object, default: null },
+  drawing: { type: Object, required: true },
+  roiMeta: { type: Object, default: null },
+})
+
+const emit = defineEmits([
+  'drop',
+  'dragover',
+  'dragleave',
+  'wheel-image',
+  'image-load',
+  'begin-roi',
+  'begin-move-roi',
+  'begin-resize-roi',
+  'zoom-in',
+  'zoom-out',
+  'reset-view',
+  'clear-roi',
+  'open-file-picker',
+])
+</script>

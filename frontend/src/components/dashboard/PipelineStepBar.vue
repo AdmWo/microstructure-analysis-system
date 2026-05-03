@@ -1,12 +1,3 @@
-<script setup>
-defineProps({
-  steps: { type: Array, required: true },
-  activeStep: { type: Number, required: true },
-})
-
-const emit = defineEmits(['step'])
-</script>
-
 <template>
   <div class="pipeline-stepper">
     <button
@@ -22,3 +13,14 @@ const emit = defineEmits(['step'])
     </button>
   </div>
 </template>
+
+<script setup>
+defineProps({
+  steps: { type: Array, required: true },
+  activeStep: { type: Number, required: true },
+})
+
+const emit = defineEmits(['step'])
+</script>
+
+

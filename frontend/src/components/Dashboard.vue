@@ -1,3 +1,82 @@
+<template>
+  <div class="stitch-dashboard" :class="['theme-' + theme, { 'is-roi-dragging': roiDraggingUi }]">
+    <DashboardTopBar :theme="theme" @toggle-theme="toggleTheme" @open-help="openHelp" />
+
+    <ScientificSidebar :tool-actions="toolActions" :active-tool="activeTool" @select-tool="activateTool">
+      <label>
+        <span>Intensywnosc filtru medianowego</span>
+        <small>{{ params.denoise_kernel_size }} px</small>
+        <input v-model.number="params.denoise_kernel_size" type="range" min="1" max="15" step="1" />
+      </label>
+      <label>
+        <span>Kontrast podgladu</span>
+        <small>{{ contrastPercent }}%</small>
+        <input v-model.number="contrastPercent" type="range" min="60" max="180" step="5" />
+      </label>
+      <label>
+        <span>Prog binaryzacji</span>
+        <small>{{ params.manual_threshold }}</small>
+        <input v-model.number="params.manual_threshold" type="range" min="0" max="255" step="1" />
+      </label>
+      <label>
+        <span>Wybor modelu</span>
+        <select v-model="selectedModel">
+          <option value="DeepMetal-V4.2_ResNet">DeepMetal-V4.2_ResNet</option>
+          <option value="DeepMetal-V3.7_EfficientNet">DeepMetal-V3.7_EfficientNet</option>
+          <option value="GrainVision-Base">GrainVision-Base</option>
+        </select>
+      </label>
+      <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
+        <span class="material-symbols-outlined">play_arrow</span>
+        {{ loading ? 'Trwa analiza...' : 'Uruchom analize' }}
+      </button>
+    </ScientificSidebar>
+
+    <main class="stitch-main">
+      <PipelineStepBar :steps="pipelineSteps" :active-step="activePipelineStep" @step="goToPipelineStep" />
+
+      <div class="content-row">
+        <StitchViewer
+          :roi-data-url="roiDataUrl"
+          :is-dragging="isDragging"
+          :error="error"
+          :frame-style="frameStyle"
+          :contrast-percent="contrastPercent"
+          :displayed-roi-box="displayedRoiBox"
+          :drawing="drawing"
+          :roi-meta="params.roi"
+          @drop="onDrop"
+          @dragover="onDragOver"
+          @dragleave="onDragLeave"
+          @wheel-image="onImageWheel"
+          @image-load="onImageLoaded"
+          @begin-roi="beginRoiSelection"
+          @begin-move-roi="beginMoveRoi"
+          @begin-resize-roi="beginResizeRoi"
+          @zoom-in="zoomIn"
+          @zoom-out="zoomOut"
+          @reset-view="resetView"
+          @clear-roi="clearRoi"
+          @open-file-picker="openFilePicker"
+        />
+
+        <DashboardMetrics
+          :histogram-bins="histogramBins"
+          :metric-cards="metricCards"
+          :aa-percent="aaPercent"
+          :vv-percent="vvPercent"
+          :pore-count="poreCount"
+          :mask-data-url="maskDataUrl"
+          :health-message="health.message"
+          @refresh-health="checkHealth"
+        />
+      </div>
+    </main>
+
+    <input ref="fileInputRef" type="file" accept="image/*" @change="onFileInput" />
+  </div>
+</template>
+
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useWorkflowStore } from '../stores/workflow'
@@ -610,82 +689,3 @@ async function runAnalysis() {
   }
 }
 </script>
-
-<template>
-  <div class="stitch-dashboard" :class="['theme-' + theme, { 'is-roi-dragging': roiDraggingUi }]">
-    <DashboardTopBar :theme="theme" @toggle-theme="toggleTheme" @open-help="openHelp" />
-
-    <ScientificSidebar :tool-actions="toolActions" :active-tool="activeTool" @select-tool="activateTool">
-      <label>
-        <span>Intensywnosc filtru medianowego</span>
-        <small>{{ params.denoise_kernel_size }} px</small>
-        <input v-model.number="params.denoise_kernel_size" type="range" min="1" max="15" step="1" />
-      </label>
-      <label>
-        <span>Kontrast podgladu</span>
-        <small>{{ contrastPercent }}%</small>
-        <input v-model.number="contrastPercent" type="range" min="60" max="180" step="5" />
-      </label>
-      <label>
-        <span>Prog binaryzacji</span>
-        <small>{{ params.manual_threshold }}</small>
-        <input v-model.number="params.manual_threshold" type="range" min="0" max="255" step="1" />
-      </label>
-      <label>
-        <span>Wybor modelu</span>
-        <select v-model="selectedModel">
-          <option value="DeepMetal-V4.2_ResNet">DeepMetal-V4.2_ResNet</option>
-          <option value="DeepMetal-V3.7_EfficientNet">DeepMetal-V3.7_EfficientNet</option>
-          <option value="GrainVision-Base">GrainVision-Base</option>
-        </select>
-      </label>
-      <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
-        <span class="material-symbols-outlined">play_arrow</span>
-        {{ loading ? 'Trwa analiza...' : 'Uruchom analize' }}
-      </button>
-    </ScientificSidebar>
-
-    <main class="stitch-main">
-      <PipelineStepBar :steps="pipelineSteps" :active-step="activePipelineStep" @step="goToPipelineStep" />
-
-      <div class="content-row">
-        <StitchViewer
-          :roi-data-url="roiDataUrl"
-          :is-dragging="isDragging"
-          :error="error"
-          :frame-style="frameStyle"
-          :contrast-percent="contrastPercent"
-          :displayed-roi-box="displayedRoiBox"
-          :drawing="drawing"
-          :roi-meta="params.roi"
-          @drop="onDrop"
-          @dragover="onDragOver"
-          @dragleave="onDragLeave"
-          @wheel-image="onImageWheel"
-          @image-load="onImageLoaded"
-          @begin-roi="beginRoiSelection"
-          @begin-move-roi="beginMoveRoi"
-          @begin-resize-roi="beginResizeRoi"
-          @zoom-in="zoomIn"
-          @zoom-out="zoomOut"
-          @reset-view="resetView"
-          @clear-roi="clearRoi"
-          @open-file-picker="openFilePicker"
-        />
-
-        <DashboardMetrics
-          :histogram-bins="histogramBins"
-          :metric-cards="metricCards"
-          :aa-percent="aaPercent"
-          :vv-percent="vvPercent"
-          :pore-count="poreCount"
-          :mask-data-url="maskDataUrl"
-          :health-message="health.message"
-          @refresh-health="checkHealth"
-        />
-      </div>
-    </main>
-
-    <input ref="fileInputRef" type="file" accept="image/*" @change="onFileInput" />
-  </div>
-</template>

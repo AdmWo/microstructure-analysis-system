@@ -1,12 +1,3 @@
-<script setup>
-defineProps({
-  toolActions: { type: Array, required: true },
-  activeTool: { type: String, required: true },
-})
-
-const emit = defineEmits(['select-tool'])
-</script>
-
 <template>
   <aside class="stitch-side-nav">
     <div class="tool-header">
@@ -31,3 +22,12 @@ const emit = defineEmits(['select-tool'])
     </div>
   </aside>
 </template>
+
+<script setup>
+defineProps({
+  toolActions: { type: Array, required: true },
+  activeTool: { type: String, required: true },
+})
+
+const emit = defineEmits(['select-tool'])
+</script>

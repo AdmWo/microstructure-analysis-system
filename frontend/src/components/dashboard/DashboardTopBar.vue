@@ -1,15 +1,3 @@
-<script setup>
-defineProps({
-  theme: {
-    type: String,
-    required: true,
-    validator: (v) => ['light', 'dark'].includes(v),
-  },
-})
-
-const emit = defineEmits(['toggle-theme', 'open-help'])
-</script>
-
 <template>
   <header class="stitch-topbar">
     <div class="brand-wrap">
@@ -21,3 +9,15 @@ const emit = defineEmits(['toggle-theme', 'open-help'])
     </div>
   </header>
 </template>
+
+<script setup>
+defineProps({
+  theme: {
+    type: String,
+    required: true,
+    validator: (v) => ['light', 'dark'].includes(v),
+  },
+})
+
+const emit = defineEmits(['toggle-theme', 'open-help'])
+</script>
