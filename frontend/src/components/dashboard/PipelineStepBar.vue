@@ -8,7 +8,7 @@
       :class="{ active: activeStep === step.id, done: activeStep > step.id }"
       @click="emit('step', step.id)"
     >
-      <div class="step-badge">{{ step.id }}</div>
+      <div class="step-badge">{{ step.id - 1 }}</div>
       <span>{{ step.label }}</span>
     </button>
   </div>

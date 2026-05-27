@@ -2,8 +2,16 @@
   <div class="stitch-dashboard" :class="['theme-' + theme, { 'is-roi-dragging': roiDraggingUi }]">
     <DashboardTopBar :theme="theme" @toggle-theme="toggleTheme" @open-help="openHelp" />
 
-    <ScientificSidebar :tool-actions="toolActions" :active-tool="activeTool" @select-tool="activateTool">
-      <p class="sidebar-stage-hint">{{ stageHint }}</p>
+    <ScientificSidebar
+      :current-stage="currentStage"
+      :steps="pipelineSteps"
+      :active-step="activePipelineStep"
+      :stage-title="currentStageTitle"
+      :stage-description="currentStageDesc"
+      @step="goToPipelineStep"
+      @prev="handlePrevStage"
+      @next="handleNextStage"
+    >
       <template v-if="currentStage === 1">
         <button type="button" class="mini-btn" @click="openFilePicker">Wgraj nowy obraz</button>
         <label>
@@ -76,7 +84,7 @@
       </template>
 
       <template v-else>
-        <p class="sidebar-stage-hint">Wyniki gotowe do przegladu i eksportu. W razie potrzeby wroc do poprzednich etapow timeline.</p>
+        <!-- Brak dodatkowych parametrów dla etapu wyników -->
       </template>
       <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
         <svg class="execute-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -87,8 +95,6 @@
     </ScientificSidebar>
 
     <main class="stitch-main">
-      <PipelineStepBar :steps="pipelineSteps" :active-step="activePipelineStep" @step="goToPipelineStep" />
-
       <div class="content-row">
         <StitchViewer
           :roi-data-url="roiDataUrl"
@@ -100,6 +106,8 @@
           :can-edit-roi="currentStage === 1"
           :displayed-roi-box="displayedRoiBox"
           :drawing="drawing"
+          :is-swapped="isSwapped"
+          :mask-data-url="maskDataUrl"
           @drop="onDrop"
           @dragover="onDragOver"
           @dragleave="onDragLeave"
@@ -108,10 +116,6 @@
           @begin-roi="beginRoiSelection"
           @begin-move-roi="beginMoveRoi"
           @begin-resize-roi="beginResizeRoi"
-          @zoom-in="zoomIn"
-          @zoom-out="zoomOut"
-          @reset-view="resetView"
-          @clear-roi="clearRoi"
           @open-file-picker="openFilePicker"
         />
 
@@ -124,9 +128,30 @@
           :aa-percent="aaPercent"
           :pore-count="poreCount"
           :mask-data-url="maskDataUrl"
-          :health-message="health.message"
-          @refresh-health="checkHealth"
+          :is-swapped="isSwapped"
+          :roi-crop-data-url="roiCropDataUrl"
+          @toggle-swap="toggleSwap"
+          @download-mask="downloadMask"
+          @download-roi="downloadRoiCrop"
         />
+      </div>
+
+      <div class="bottom-bar">
+        <div class="bottom-viewer-controls">
+          <button type="button" class="bottom-btn" @click="zoomIn" title="Powiększ">+</button>
+          <button type="button" class="bottom-btn" @click="zoomOut" title="Pomniejsz">-</button>
+          <button type="button" class="bottom-btn" @click="resetView">Dopasuj</button>
+          <button type="button" class="bottom-btn" @click="clearRoi" :disabled="!params.roi">Wyczyść ROI</button>
+          <button v-if="maskDataUrl" type="button" class="bottom-btn" @click="toggleSwap" :class="{ 'btn-active': isSwapped }">
+            {{ isSwapped ? 'Pokaż oryginał' : 'Pokaż maskę' }}
+          </button>
+        </div>
+
+        <div class="bottom-api-status" :class="health.status">
+          <span class="status-dot"></span>
+          <span class="status-text">{{ health.message }}</span>
+          <button type="button" class="bottom-btn-mini" @click="checkHealth">Odśwież</button>
+        </div>
       </div>
     </main>
 
@@ -156,7 +181,6 @@ import { useWorkflowStore } from '../stores/workflow'
 import { analyzeImage } from '../api/analyze'
 import DashboardTopBar from './dashboard/DashboardTopBar.vue'
 import ScientificSidebar from './dashboard/ScientificSidebar.vue'
-import PipelineStepBar from './dashboard/PipelineStepBar.vue'
 import StitchViewer from './dashboard/StitchViewer.vue'
 import DashboardMetrics from './dashboard/DashboardMetrics.vue'
 
@@ -170,6 +194,7 @@ const theme = ref('light')
 const isDragging = ref(false)
 const localPreview = ref(null)
 const fileInputRef = ref(null)
+const isSwapped = ref(false)
 const imageNatural = reactive({ width: 0, height: 0 })
 const imageRender = reactive({ width: 0, height: 0 })
 const imageStats = reactive({ mean: null, stdDev: null, snr: null })
@@ -253,9 +278,11 @@ const histogramNote = computed(() => {
     ? `Histogram liczony z aktualnego ROI. Marker pokazuje prog reczny = ${params.manual_threshold}.`
     : 'Histogram liczony z aktualnego ROI. Prog Otsu jest wyliczany automatycznie przez API.'
 })
+const roiCropDataUrl = computed(() => result.value?.roi_b64 ? `data:image/png;base64,${result.value.roi_b64}` : null)
+
 const pipelineSteps = computed(() => ([
-  { id: 1, label: 'Akwizycja obrazu' },
-  { id: 2, label: 'ROI i przetwarzanie wstepne' },
+  { id: 1, label: 'Obraz' },
+  { id: 2, label: 'Przetwarzanie Wstepne' },
   { id: 3, label: 'Segmentacja (ML)' },
   { id: 4, label: 'Analiza cech' },
   { id: 5, label: 'Wyniki' },
@@ -265,16 +292,35 @@ const activePipelineStep = computed(() => {
   return Math.min(5, currentStage.value + 1)
 })
 
-const stageHint = computed(() => {
-  switch (workflow.currentStage) {
+const currentStageTitle = computed(() => {
+  switch (activePipelineStep.value) {
     case 1:
-      return 'Etap przygotowania: ustaw ROI, inwersje i kontrast. Tool-list sluzy do szybkich presetow, a timeline do przechodzenia etapow.'
+      return 'Obraz'
     case 2:
-      return 'Etap binaryzacji: wybierz Otsu lub reczny prog. Timeline steruje etapem, tool-list nie zmienia etapu.'
+      return 'Przetwarzanie Wstępne'
     case 3:
-      return 'Etap morfologii: otwarcie i domkniecie oczyszczaja maske przed liczeniem porow.'
+      return 'Segmentacja (ML)'
     case 4:
-      return 'Etap wynikow: uruchom analize i porownaj metryki/maski. Eksport zapisze aktualne parametry.'
+      return 'Analiza cech'
+    case 5:
+      return 'Wyniki'
+    default:
+      return ''
+  }
+})
+
+const currentStageDesc = computed(() => {
+  switch (activePipelineStep.value) {
+    case 1:
+      return 'Etap przygotowania obrazu: wgraj plik graficzny z dysku lub przeciągnij go do obszaru roboczego, aby rozpocząć proces analizy struktury porowatej.'
+    case 2:
+      return 'Etap przygotowania: pozwala na zdefiniowanie obszaru zainteresowania (ROI) na obrazie wejściowym oraz wstępne dostosowanie jasności/kontrastu i filtrów wygładzających.'
+    case 3:
+      return 'Etap binaryzacji: segmentacja obrazu. Umożliwia dobór progu odcięcia (ręczny suwak lub automatyczna metoda Otsu) w celu odróżnienia porów od tła metalicznego.'
+    case 4:
+      return 'Etap morfologii: oczyszczanie maski binarnej za pomocą operacji morfologicznego otwarcia (usuwanie drobnych szumów) oraz domknięcia (łączenie pęknięć i luk).'
+    case 5:
+      return 'Etap wyników: prezentacja obliczonych wskaźników stereologicznych (porowatość powierzchniowa i objętościowa) oraz eksport kompletnego raportu z pomiaru.'
     default:
       return ''
   }
@@ -282,8 +328,7 @@ const stageHint = computed(() => {
 
 function goToPipelineStep(step) {
   if (step === 1) {
-    if (!file.value) openFilePicker()
-    else workflow.goToStage(1)
+    openFilePicker()
     return
   }
   if (!file.value) {
@@ -340,6 +385,7 @@ function setFile(f) {
   params.roi = null
   workflow.reset()
   resetView()
+  isSwapped.value = false
   nextTick(computeImageAnalytics)
 }
 
@@ -843,6 +889,7 @@ async function runAnalysis() {
   error.value = null
   result.value = null
   loading.value = true
+  isSwapped.value = false
 
   try {
     result.value = await analyzeImage(file.value, {
@@ -854,6 +901,40 @@ async function runAnalysis() {
     error.value = e.message || 'Analiza nie powiodła się.'
   } finally {
     loading.value = false
+  }
+}
+
+function toggleSwap() {
+  isSwapped.value = !isSwapped.value
+}
+
+function downloadMask() {
+  if (!maskDataUrl.value) return
+  const link = document.createElement('a')
+  link.href = maskDataUrl.value
+  link.download = 'maska-segmentacji.png'
+  link.click()
+}
+
+function downloadRoiCrop() {
+  if (!roiCropDataUrl.value) return
+  const link = document.createElement('a')
+  link.href = roiCropDataUrl.value
+  link.download = 'obszar-roi.png'
+  link.click()
+}
+
+function handlePrevStage() {
+  if (activePipelineStep.value <= 2) {
+    openFilePicker()
+  } else {
+    goToPipelineStep(activePipelineStep.value - 1)
+  }
+}
+
+function handleNextStage() {
+  if (activePipelineStep.value < 5) {
+    goToPipelineStep(activePipelineStep.value + 1)
   }
 }
 </script>

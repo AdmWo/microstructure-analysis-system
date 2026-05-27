@@ -9,14 +9,14 @@
     <div v-else class="stitch-image-frame-wrap" @wheel.prevent="emit('wheel-image', $event)">
       <div class="stitch-image-frame" :style="frameStyle">
         <img
-          :src="roiDataUrl"
+          :src="mainImageSrc"
           alt="Mikrostruktura"
           class="main-image"
           draggable="false"
           :style="{ filter: baseImageFilter }"
           @load="emit('image-load', $event)"
         />
-        <div v-if="invertRoi && displayedRoiBox" class="roi-live-invert-layer" :style="roiInvertClipStyle">
+        <div v-if="invertRoi && displayedRoiBox && !isSwapped" class="roi-live-invert-layer" :style="roiInvertClipStyle">
           <img :src="roiDataUrl" alt="" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%) invert(100%)` }" aria-hidden="true" />
         </div>
         <div
@@ -27,8 +27,15 @@
             v-if="displayedRoiBox"
             class="roi-box"
             :style="{ left: `${displayedRoiBox.left}px`, top: `${displayedRoiBox.top}px`, width: `${displayedRoiBox.width}px`, height: `${displayedRoiBox.height}px` }"
-            @mousedown.stop="emit('begin-move-roi', $event)"
+            @mousedown="handleRoiMouseDown"
           >
+            <img
+              v-if="isSwapped && maskDataUrl"
+              :src="maskDataUrl"
+              alt="Maska"
+              draggable="false"
+              style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1;"
+            />
             <span
               v-if="canEditRoi"
               v-for="handle in HANDLES"
@@ -45,13 +52,6 @@
           />
         </div>
       </div>
-    </div>
-
-    <div class="viewer-controls">
-      <button type="button" @click="emit('zoom-in')">+</button>
-      <button type="button" @click="emit('zoom-out')">-</button>
-      <button type="button" @click="emit('reset-view')">Dopasuj</button>
-      <button type="button" @click="emit('clear-roi')">Wyczysc ROI</button>
     </div>
   </section>
 </template>
@@ -71,6 +71,8 @@ const props = defineProps({
   canEditRoi: { type: Boolean, default: false },
   displayedRoiBox: { type: Object, default: null },
   drawing: { type: Object, required: true },
+  isSwapped: { type: Boolean, default: false },
+  maskDataUrl: { type: String, default: null },
 })
 
 const emit = defineEmits([
@@ -82,12 +84,23 @@ const emit = defineEmits([
   'begin-roi',
   'begin-move-roi',
   'begin-resize-roi',
-  'zoom-in',
-  'zoom-out',
-  'reset-view',
-  'clear-roi',
   'open-file-picker',
 ])
+
+const mainImageSrc = computed(() => {
+  if (props.isSwapped && props.maskDataUrl && !props.displayedRoiBox) {
+    return props.maskDataUrl
+  }
+  return props.roiDataUrl
+})
+
+const baseImageFilter = computed(() => {
+  if (props.isSwapped && props.maskDataUrl && !props.displayedRoiBox) {
+    return 'none'
+  }
+  const shouldInvertWholeImage = props.invertRoi && !props.displayedRoiBox
+  return `contrast(${props.contrastPercent}%)${shouldInvertWholeImage ? ' invert(100%)' : ''}`
+})
 
 const roiInvertClipStyle = computed(() => {
   if (!props.displayedRoiBox) return null
@@ -99,8 +112,10 @@ const roiInvertClipStyle = computed(() => {
   }
 })
 
-const baseImageFilter = computed(() => {
-  const shouldInvertWholeImage = props.invertRoi && !props.displayedRoiBox
-  return `contrast(${props.contrastPercent}%)${shouldInvertWholeImage ? ' invert(100%)' : ''}`
-})
+function handleRoiMouseDown(e) {
+  if (props.canEditRoi) {
+    e.stopPropagation()
+    emit('begin-move-roi', e)
+  }
+}
 </script>

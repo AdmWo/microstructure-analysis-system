@@ -564,7 +564,7 @@ select {
   width: 100%;
   height: 100%;
   transform-origin: center center;
-  transition: transform 0.05s linear;
+  will-change: transform;
 }
 
 .timeline-modern {
@@ -946,10 +946,15 @@ select {
 
 .control-panel {
   margin-top: auto;
-  border-top: 1px solid #1c1c1f;
+  border-top: 1px solid var(--outline);
   padding: 20px 24px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  height: 380px;
+  min-height: 380px;
+  max-height: 380px;
+  box-sizing: border-box;
 }
 
 .control-panel label {
@@ -995,10 +1000,140 @@ select {
   gap: 8px;
 }
 
-.sidebar-stage-hint {
-  margin: 0 0 10px;
-  font: 500 11px/1.45 'Space Grotesk', sans-serif;
+.vertical-stepper {
+  padding: 12px 24px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.sidebar-nav-buttons {
+  display: flex;
+  gap: 12px;
+  padding: 6px 24px 12px;
+  border-bottom: 1px solid var(--outline);
+  box-sizing: border-box;
+}
+
+.sidebar-nav-buttons .nav-btn {
+  flex: 1;
+  height: 32px;
+  border: 1px solid var(--outline);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 4px;
+  font: 700 10px/1 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-nav-buttons .nav-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.sidebar-nav-buttons .nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+
+.vertical-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-soft);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 4px;
+  text-align: left;
+  width: 100%;
+  transition: all 0.2s;
+  opacity: 0.55;
+  box-sizing: border-box;
+}
+
+.vertical-step:hover {
+  opacity: 1;
+  background: var(--surface-2);
+}
+
+.vertical-step.active {
+  opacity: 1;
+  color: var(--primary);
+  border-color: var(--outline);
+  background: var(--surface-2);
+}
+
+.vertical-step.done {
+  opacity: 0.85;
+  color: var(--text);
+}
+
+.vertical-step .step-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 9px/1 'Space Grotesk', sans-serif;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.vertical-step.active .step-badge {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.vertical-step.done .step-badge {
+  border-color: var(--outline);
+  background: var(--surface-3);
+}
+
+.vertical-step .step-label {
+  font: 700 10px/1 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-stage-info {
+  height: 110px;
+  min-height: 110px;
+  max-height: 110px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--outline);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+}
+
+.stage-info-title {
+  margin: 0;
+  color: var(--primary);
+  font: 700 11px/1.2 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+}
+
+.stage-info-description {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .control-panel span {
@@ -1023,7 +1158,10 @@ select {
 }
 
 .execute-btn {
+  margin-top: auto;
   height: 42px;
+  min-height: 42px;
+  flex-shrink: 0;
   border: 0;
   background: #00d1ff;
   color: #003543;
@@ -1165,26 +1303,108 @@ select {
   font: 500 11px/1.3 'Space Grotesk', sans-serif;
 }
 
-.viewer-controls {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
+.bottom-bar {
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+  border-top: 1px solid var(--outline);
+  background: var(--surface);
   display: flex;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-sizing: border-box;
 }
 
-.viewer-controls button {
-  border: 1px solid #3c494e;
-  background: #2a2a2b;
-  color: #e5e2e3;
-  padding: 6px 8px;
+.bottom-viewer-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.bottom-btn {
+  background: var(--surface-3);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font: 600 10px/1 'Space Grotesk', sans-serif;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bottom-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.bottom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bottom-btn.btn-active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.bottom-api-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 9px 'Space Grotesk', sans-serif;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.bottom-api-status.ok .status-dot {
+  background: #10b981;
+}
+
+.bottom-api-status.error .status-dot {
+  background: #ef4444;
+}
+
+.bottom-api-status.checking .status-dot {
+  background: #f59e0b;
+}
+
+.bottom-btn-mini {
+  background: transparent;
+  border: 1px solid var(--outline);
+  color: var(--text-muted);
+  font: 600 9px 'Space Grotesk', sans-serif;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: 4px;
+}
+
+.bottom-btn-mini:hover {
+  border-color: var(--text-soft);
+  color: var(--text);
 }
 
 .metrics-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-content: start;
-  overflow: auto;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .metric-card {
@@ -1521,8 +1741,8 @@ select {
 .stitch-image-frame {
   position: relative;
   transform-origin: center center;
-  transition: transform 0.05s linear;
   flex: 0 0 auto;
+  will-change: transform;
 }
 
 .roi-live-invert-layer {

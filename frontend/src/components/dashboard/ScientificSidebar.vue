@@ -1,26 +1,39 @@
 <template>
   <aside class="stitch-side-nav">
     <div class="tool-header">
-      <h3>Narzedzia naukowe</h3>
-      <p>Sterowanie instrumentem</p>
+      <h3>Postęp pomiaru</h3>
+      <p>Etapy workflow</p>
     </div>
-    <label class="compact-tool-select-wrap" for="tool-select">
-      <span>Narzędzie</span>
-      <select id="tool-select" class="compact-tool-select" :value="activeTool" @change="emit('select-tool', $event.target.value)">
-        <option v-for="tool in toolActions" :key="tool" :value="tool">{{ tool }}</option>
-      </select>
-    </label>
-    <div class="tool-list">
+
+    <!-- Vertical Stepper -->
+    <div class="vertical-stepper">
       <button
-        v-for="tool in toolActions"
-        :key="tool"
+        v-for="step in steps"
+        :key="step.id"
         type="button"
-        class="tool-button"
-        :class="{ active: activeTool === tool }"
-        @click="emit('select-tool', tool)"
+        class="vertical-step"
+        :class="{ active: activeStep === step.id, done: activeStep > step.id }"
+        @click="emit('step', step.id)"
       >
-        <span>{{ tool }}</span>
+        <div class="step-badge">{{ step.id - 1 }}</div>
+        <span class="step-label">{{ step.label }}</span>
       </button>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="sidebar-nav-buttons">
+      <button type="button" class="nav-btn prev-btn" @click="emit('prev')">
+        Wstecz
+      </button>
+      <button type="button" class="nav-btn next-btn" :disabled="activeStep === 5" @click="emit('next')">
+        Dalej
+      </button>
+    </div>
+
+    <!-- Stage Info Description Section -->
+    <div class="sidebar-stage-info">
+      <h4 class="stage-info-title">{{ stageTitle }}</h4>
+      <p class="stage-info-description">{{ stageDescription }}</p>
     </div>
 
     <div class="control-panel">
@@ -31,9 +44,12 @@
 
 <script setup>
 defineProps({
-  toolActions: { type: Array, required: true },
-  activeTool: { type: String, required: true },
+  currentStage: { type: Number, required: true },
+  steps: { type: Array, required: true },
+  activeStep: { type: Number, required: true },
+  stageTitle: { type: String, required: true },
+  stageDescription: { type: String, required: true },
 })
 
-const emit = defineEmits(['select-tool'])
+const emit = defineEmits(['step', 'prev', 'next'])
 </script>

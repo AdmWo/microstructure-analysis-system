@@ -42,21 +42,41 @@
       </div>
     </section>
 
-    <section v-if="maskDataUrl" class="metric-card">
-      <h4>Maska segmentacji</h4>
-      <img :src="maskDataUrl" alt="Maska segmentacji" class="mask-image" />
+    <section v-if="maskDataUrl" class="metric-card" style="margin-top: auto;">
+      <div class="metric-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h4 style="margin: 0; font: 700 10px/1 'Space Grotesk', sans-serif;">
+          {{ isSwapped ? 'Wycięty obszar (ROI)' : 'Maska segmentacji' }}
+        </h4>
+        <button
+          type="button"
+          class="swap-btn"
+          @click="emit('toggle-swap')"
+          style="background: #2a2a2b; border: 1px solid #3c494e; color: #e5e2e3; font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
+          :style="isSwapped ? 'border-color: #00d1ff; color: #00d1ff; background: rgba(0, 209, 255, 0.1);' : ''"
+        >
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display: block;">
+            <path d="M19 8l-4 4h3v6h-6v2h8V12h3L19 8zM5 16l4-4H6V6h6V4H4v8H1l4 4z" />
+          </svg>
+          Zamień
+        </button>
+      </div>
+      <img :src="isSwapped ? roiCropDataUrl : maskDataUrl" :alt="isSwapped ? 'Wycięty obszar ROI' : 'Maska segmentacji'" class="mask-image" />
+      <div style="margin-top: 8px; display: flex;">
+        <button
+          type="button"
+          @click="emit('download-mask')"
+          style="flex: 1; background: #2563eb; border: none; color: #fff; font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; font-weight: 500; display: flex; align-items: center; justify-content: center;"
+        >
+          Zapisz
+        </button>
+      </div>
     </section>
 
-    <section class="metric-card status">
-      <span class="dot" />
-      {{ healthMessage }}
-      <button type="button" class="retry-health" @click="emit('refresh-health')">Odswiez</button>
-    </section>
   </aside>
 </template>
 
 <script setup>
-const emit = defineEmits(['refresh-health'])
+const emit = defineEmits(['toggle-swap', 'download-mask', 'download-roi'])
 
 defineProps({
   histogramBins: { type: Array, required: true },
@@ -67,6 +87,7 @@ defineProps({
   aaPercent: { type: Number, default: null },
   poreCount: { type: Number, default: null },
   maskDataUrl: { type: String, default: null },
-  healthMessage: { type: String, required: true },
+  isSwapped: { type: Boolean, default: false },
+  roiCropDataUrl: { type: String, default: null },
 })
 </script>
