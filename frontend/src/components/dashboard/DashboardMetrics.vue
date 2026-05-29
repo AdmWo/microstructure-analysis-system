@@ -51,8 +51,8 @@
           type="button"
           class="swap-btn"
           @click="emit('toggle-swap')"
-          style="background: #2a2a2b; border: 1px solid #3c494e; color: #e5e2e3; font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
-          :style="isSwapped ? 'border-color: #00d1ff; color: #00d1ff; background: rgba(0, 209, 255, 0.1);' : ''"
+          style="background: var(--surface-3); border: 1px solid var(--outline); color: var(--text); font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
+          :style="isSwapped ? 'border-color: var(--primary); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent);' : ''"
         >
           <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display: block;">
             <path d="M19 8l-4 4h3v6h-6v2h8V12h3L19 8zM5 16l4-4H6V6h6V4H4v8H1l4 4z" />
@@ -65,7 +65,7 @@
         <button
           type="button"
           @click="emit('download-mask')"
-          style="flex: 1; background: #2563eb; border: none; color: #fff; font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; font-weight: 500; display: flex; align-items: center; justify-content: center;"
+          style="flex: 1; background: var(--primary); border: none; color: var(--primary-text); font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Space Grotesk', sans-serif;"
         >
           Zapisz
         </button>
