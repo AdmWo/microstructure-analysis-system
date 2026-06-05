@@ -60,15 +60,43 @@ def morphological_cleanup(mask: np.ndarray, params: AnalysisParams) -> np.ndarra
     return cleaned
 
 
-def stereology_stats(mask: np.ndarray) -> tuple[int, float, float]:
-    """Calculate pore count and stereological porosity estimators A_A and V_V."""
+def stereology_stats(mask: np.ndarray, params: AnalysisParams) -> tuple[int, float, float, float | None, float | None, float | None]:
+    """Calculate pore count and stereological porosity estimators A_A and V_V, along with physical area metrics."""
     pore_pixels = int(np.sum(mask == 255))
     total_pixels = mask.size
     aa_percent = round(100.0 * pore_pixels / total_pixels, 2)
     vv_percent = aa_percent
     num_labels, _, _, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     pore_count = max(0, num_labels - 1)
-    return pore_count, aa_percent, vv_percent
+
+    total_roi_area_physical = None
+    average_pore_area_physical = None
+    n_a = None
+
+    if params.scale_enabled and params.scale_px_length > 0:
+        pixel_to_unit_ratio = params.scale_physical_value / params.scale_px_length
+        pixel_to_unit_ratio_sq = pixel_to_unit_ratio ** 2
+        
+        # Calculate physical ROI area
+        total_roi_area_physical = float(total_pixels * pixel_to_unit_ratio_sq)
+        
+        # Calculate physical average pore area
+        total_pore_area_physical = float(pore_pixels * pixel_to_unit_ratio_sq)
+        average_pore_area_physical = float(total_pore_area_physical / pore_count) if pore_count > 0 else 0.0
+        
+        # Calculate pore density N_A
+        if total_roi_area_physical > 0:
+            raw_n_a = pore_count / total_roi_area_physical
+            if params.scale_unit == "µm":
+                # Normalize to number of pores per 10,000 µm²
+                n_a = float(raw_n_a * 10000)
+            else:
+                # If mm, number of pores per 1 mm²
+                n_a = float(raw_n_a)
+        else:
+            n_a = 0.0
+
+    return pore_count, aa_percent, vv_percent, total_roi_area_physical, average_pore_area_physical, n_a
 
 
 def encode_image_b64(img: np.ndarray, fmt: str = ".png") -> str:
@@ -79,7 +107,7 @@ def encode_image_b64(img: np.ndarray, fmt: str = ".png") -> str:
     return base64.b64encode(buf.tobytes()).decode("utf-8")
 
 
-def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, np.ndarray, int, float, float, int]:
+def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, np.ndarray, int, float, float, int, float | None, float | None, float | None]:
     """Execute the staged scientific workflow and return ROI/mask/stats."""
     roi_img = crop_roi(img, params.roi)
     if params.invert_roi:
@@ -99,5 +127,5 @@ def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, n
     else:
         cleaned_mask = segmented
 
-    pore_count, aa_percent, vv_percent = stereology_stats(cleaned_mask)
-    return roi_img, cleaned_mask, pore_count, aa_percent, vv_percent, thresh_val
+    pore_count, aa_percent, vv_percent, total_roi_area_physical, average_pore_area_physical, n_a = stereology_stats(cleaned_mask, params)
+    return roi_img, cleaned_mask, pore_count, aa_percent, vv_percent, thresh_val, total_roi_area_physical, average_pore_area_physical, n_a

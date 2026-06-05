@@ -39,6 +39,26 @@
         <span>Liczba porow</span>
         <strong>{{ poreCount !== null ? poreCount : 'brak danych' }}</strong>
       </div>
+      <template v-if="scaleEnabled && totalRoiAreaPhysical !== null">
+        <div style="margin: 0.6rem 0; border-top: 1px dashed var(--panel-border);"></div>
+        <div class="metric-row">
+          <span>Obszar ROI</span>
+          <strong>{{ `${totalRoiAreaPhysical.toFixed(2)} ${scaleUnit}²` }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Śr. obszar poru</span>
+          <strong>{{ `${averagePoreAreaPhysical.toFixed(2)} ${scaleUnit}²` }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Gęstość porów N_A</span>
+          <strong>
+            {{ poreDensityNA.toFixed(2) }}
+            <small style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
+              {{ scaleUnit === 'µm' ? 'porów / 10⁴ µm²' : 'porów / mm²' }}
+            </small>
+          </strong>
+        </div>
+      </template>
     </section>
 
     <section class="metric-card">
@@ -99,5 +119,12 @@ defineProps({
   isSwapped: { type: Boolean, default: false },
   roiCropDataUrl: { type: String, default: null },
   canSwap: { type: Boolean, default: true },
+
+  // Scale calibration props
+  scaleEnabled: { type: Boolean, default: false },
+  scaleUnit: { type: String, default: 'µm' },
+  totalRoiAreaPhysical: { type: Number, default: null },
+  averagePoreAreaPhysical: { type: Number, default: null },
+  poreDensityNA: { type: Number, default: null },
 })
 </script>

@@ -12,6 +12,9 @@ class AnalysisResult(BaseModel):
     vv_percent: float
     message: str = "Analysis complete"
     used_threshold: int | None = None
+    total_roi_area_physical: float | None = None
+    average_pore_area_physical: float | None = None
+    N_A: float | None = None
 
 
 class RoiSelection(BaseModel):
@@ -33,3 +36,7 @@ class AnalysisParams(BaseModel):
     manual_threshold: int = Field(default=120, ge=0, le=255)
     morph_open_iterations: int = Field(default=1, ge=0, le=20)
     morph_close_iterations: int = Field(default=1, ge=0, le=20)
+    scale_enabled: bool = False
+    scale_px_length: float = Field(default=0.0, ge=0.0)
+    scale_physical_value: float = Field(default=1.0, gt=0.0)
+    scale_unit: str = Field(default="µm", pattern="^(µm|mm)$")
