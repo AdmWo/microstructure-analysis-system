@@ -12,7 +12,25 @@
       @prev="handlePrevStage"
       @next="handleNextStage"
     >
+      <!-- Step 1: Obraz (List & upload of multiple images) -->
       <template v-if="currentStage === 1">
+        <button type="button" class="mini-btn" @click="openFilePicker">Dodaj obrazy</button>
+        <div class="sidebar-image-list">
+          <div
+            v-for="(img, idx) in images"
+            :key="img.id"
+            class="sidebar-image-item"
+            :class="{ active: idx === activeImageIndex }"
+            @click="setActiveImage(idx)"
+          >
+            <span class="sidebar-image-name" :title="img.name">{{ img.name }}</span>
+            <button type="button" class="sidebar-image-del" @click.stop="deleteImage(idx)">×</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Step 2: Przetwarzanie Wstępne (ROI & Contrast) -->
+      <template v-else-if="currentStage === 2">
         <button type="button" class="mini-btn" @click="openFilePicker">Wgraj nowy obraz</button>
         <label>
           <span>Kontrast analizy (API + podglad)</span>
@@ -43,7 +61,8 @@
         </label>
       </template>
 
-      <template v-else-if="currentStage === 2">
+      <!-- Step 3: Kalibracja Skali -->
+      <template v-else-if="currentStage === 3">
         <div class="scale-calibration-controls" style="display: grid; gap: 0.6rem;">
           <p style="margin: 0 0 0.2rem; font-size: 0.75rem; color: var(--text-soft); line-height: 1.4;">
             Włącz tryb rysowania i przeciągnij linię o znanej długości fizycznej na obrazie. Przytrzymaj <strong>Shift</strong>, aby przyciągać linię do najbliższej osi (pion / poziom).
@@ -76,10 +95,24 @@
               </select>
             </label>
           </div>
+
+          <button
+            v-if="images.length > 1 && workflow.scalePxLength > 0"
+            type="button"
+            class="mini-btn scale-copy-btn"
+            @click="copyScaleToAll"
+            style="width: 100%; text-align: center; margin-top: 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa;"
+          >
+            Kopiuj kalibrację do pozostałych
+          </button>
+          <p v-if="scaleCopiedStatus" style="font-size: 10px; color: #10b981; margin: 4px 0 0; text-align: center;">
+            Pomyślnie skopiowano do wszystkich zdjęć!
+          </p>
         </div>
       </template>
 
-      <template v-else-if="currentStage === 3">
+      <!-- Step 4: Segmentacja -->
+      <template v-else-if="currentStage === 4">
         <label>
           <span>Metoda binaryzacji (API)</span>
           <select id="binarization-method" name="binarization_method" v-model="params.binarization_method">
@@ -101,7 +134,8 @@
         </label>
       </template>
 
-      <template v-else-if="currentStage === 4">
+      <!-- Step 5: Identyfikacja i Analiza Cech -->
+      <template v-else-if="currentStage === 5">
         <label>
           <span>Morfologia — otwarcie (iteracje)</span>
           <small>{{ params.morph_open_iterations }}</small>
@@ -125,7 +159,8 @@
       <template v-else>
         <!-- Brak dodatkowych parametrów dla etapu wyników -->
       </template>
-      <button type="button" class="execute-btn" :disabled="loading || !file" @click="runAnalysis">
+
+      <button type="button" class="execute-btn" :disabled="loading || images.length === 0" @click="runAnalysis">
         <svg class="execute-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M8 5v14l11-7z" fill="currentColor" />
         </svg>
@@ -143,7 +178,7 @@
           :frame-style="frameStyle"
           :contrast-percent="params.contrast_percent"
           :invert-roi="params.invert_roi"
-          :can-edit-roi="currentStage === 1 && workflow.interactionMode === 'roi'"
+          :can-edit-roi="currentStage === 2 && workflow.interactionMode === 'roi'"
           :space-pressed="view.spacePressed"
           :displayed-roi-box="displayedRoiBox"
           :drawing="drawing"
@@ -159,6 +194,8 @@
           :image-render="imageRender"
           :measure-line-coords="workflow.measureLineCoords"
           :measure-drawing="measureDrawing"
+          :images="images"
+          :active-image-index="activeImageIndex"
           @drop="onDrop"
           @dragover="onDragOver"
           @dragleave="onDragLeave"
@@ -169,6 +206,8 @@
           @begin-resize-roi="beginResizeRoi"
           @begin-resize-measure="beginResizeMeasure"
           @open-file-picker="openFilePicker"
+          @select-image="setActiveImage"
+          @delete-image="deleteImage"
         />
 
         <DashboardMetrics
@@ -181,30 +220,33 @@
           :min-intensity="histogramMinIntensity"
           :max-intensity="histogramMaxIntensity"
           :metric-cards="metricCards"
-          :aa-percent="aaPercent"
-          :pore-count="poreCount"
+          :aa-percent="displayAaPercent"
+          :pore-count="displayPoreCount"
           :mask-data-url="maskDataUrl"
           :is-swapped="isSwapped"
           :roi-crop-data-url="roiCropDataUrl"
-          :can-swap="activePipelineStep === 6"
+          :can-swap="activePipelineStep === 6 && !!maskDataUrl"
           :scale-enabled="workflow.scalePxLength > 0"
           :scale-unit="workflow.scaleUnit"
-          :total-roi-area-physical="result?.total_roi_area_physical"
-          :average-pore-area-physical="result?.average_pore_area_physical"
-          :pore-density-n-a="result?.N_A"
-          :avg-d1-circularity-perimeter="workflow.avgD1CircularityPerimeter"
-          :avg-d2-circularity-area="workflow.avgD2CircularityArea"
-          :avg-edge-indicator="workflow.avgEdgeIndicator"
-          :avg-shape-factor-raw="workflow.avgShapeFactorRaw"
-          :avg-roundness-ellipse="workflow.avgRoundnessEllipse"
-          :avg-malinowska-factor="workflow.avgMalinowskaFactor"
+          :total-roi-area-physical="displayTotalRoiArea"
+          :average-pore-area-physical="displayAveragePoreArea"
+          :pore-density-n-a="displayPoreDensityNA"
+          :avg-d1-circularity-perimeter="displayD1"
+          :avg-d2-circularity-area="displayD2"
+          :avg-edge-indicator="displayEdge"
+          :avg-shape-factor-raw="displayShape"
+          :avg-roundness-ellipse="displayRoundness"
+          :avg-malinowska-factor="displayMalinowska"
           :is-thinner="histogramThinner"
           :is-threshold-editable="isThresholdEditable"
+          :images-count="images.length"
+          :show-averages="showAverages"
           @toggle-swap="toggleSwap"
           @download-mask="downloadMask"
           @download-roi="downloadRoiCrop"
           @update-threshold="onUpdateThreshold"
           @toggle-thickness="toggleHistogramThickness"
+          @toggle-display-mode="showAverages = $event"
         />
       </div>
 
@@ -252,7 +294,7 @@
       </div>
     </main>
 
-    <input ref="fileInputRef" type="file" accept="image/*" @change="onFileInput" />
+    <input ref="fileInputRef" type="file" accept="image/*" multiple @change="onFileInput" />
 
     <div v-if="helpOpen" class="help-modal-backdrop" @click.self="closeHelp">
       <section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
@@ -261,11 +303,11 @@
           <button type="button" class="help-close-btn" @click="closeHelp" aria-label="Zamknij pomoc">×</button>
         </header>
         <div class="help-modal-content">
-          <p>1) Wgraj obraz.</p>
-          <p>2) Ustaw ROI i parametry przetwarzania.</p>
-          <p>3) Wybierz binaryzacje i uruchom analize.</p>
-          <p>4) Maska wynikowa pokazuje pory jako obszary jasne, a material jako ciemny.</p>
-          <p>5) Timeline u gory zmienia etap pracy, a panel po lewej pokazuje sterowanie dla aktualnego etapu.</p>
+          <p>1) Wgraj jeden lub wiele obrazów.</p>
+          <p>2) Ustaw ROI i parametry przetwarzania dla każdego z nich.</p>
+          <p>3) Skalibruj skalę i skopiuj ją do pozostałych (jeśli mają tę samą powiększenie).</p>
+          <p>4) Wybierz parametry binaryzacji i uruchom analizę.</p>
+          <p>5) Wyniki pokażą wartości uśrednione dla całego zbioru oraz szczegóły pojedynczych klatek.</p>
         </div>
       </section>
     </div>
@@ -283,6 +325,12 @@ import DashboardMetrics from './dashboard/DashboardMetrics.vue'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const workflow = useWorkflowStore()
+
+// State for multiple images
+const images = ref([])
+const activeImageIndex = ref(-1)
+const showAverages = ref(true)
+
 const file = ref(null)
 const result = ref(null)
 const error = ref(null)
@@ -351,14 +399,58 @@ const params = reactive({
   morph_close_iterations: 1,
 })
 const selectedModel = ref('DeepMetal-V4.2_ResNet')
-const toolActions = ['Przytnij ROI', 'Filtr medianowy', 'Wybór modelu', 'Progowanie', 'Kontrast', 'Eksport']
 const activeTool = ref('Przytnij ROI')
 
 const currentStage = computed(() => workflow.currentStage)
 const maskDataUrl = computed(() => result.value?.mask_b64 ? `data:image/png;base64,${result.value.mask_b64}` : null)
 const roiDataUrl = computed(() => localPreview.value)
-const aaPercent = computed(() => result.value?.aa_percent ?? null)
-const poreCount = computed(() => result.value?.pore_count ?? null)
+
+// Computed metrics displaying either Average or Active Image values
+const displayAaPercent = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgAaPercent
+  return result.value?.aa_percent ?? null
+})
+const displayPoreCount = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgPoreCount
+  return result.value?.pore_count ?? null
+})
+const displayTotalRoiArea = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgTotalRoiArea
+  return result.value?.total_roi_area_physical ?? null
+})
+const displayAveragePoreArea = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgPoreArea
+  return result.value?.average_pore_area_physical ?? null
+})
+const displayPoreDensityNA = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgNa
+  return result.value?.N_A ?? null
+})
+const displayD1 = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgD1CircularityPerimeter
+  return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgD1CircularityPerimeter ?? null) : null
+})
+const displayD2 = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgD2CircularityArea
+  return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgD2CircularityArea ?? null) : null
+})
+const displayEdge = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgEdgeIndicator
+  return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgEdgeIndicator ?? null) : null
+})
+const displayShape = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgShapeFactorRaw
+  return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgShapeFactorRaw ?? null) : null
+})
+const displayRoundness = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgRoundnessEllipse
+  return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgRoundnessEllipse ?? null) : null
+})
+const displayMalinowska = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgMalinowskaFactor
+  return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgMalinowskaFactor ?? null) : null
+})
+
 const displayedRoiBox = computed(() => {
   if (!params.roi || !imageNatural.width || !imageNatural.height || !imageRender.width || !imageRender.height) return null
   const sx = imageRender.width / imageNatural.width
@@ -420,7 +512,7 @@ const ghostThresholdPercent = computed(() => {
 
 const histogramNote = computed(() => {
   if (!roiDataUrl.value) return 'Wgraj obraz, aby zobaczyc histogram ROI.'
-  let note = 'Histogram liczony z aktualnego ROI. '
+  let note = 'Histogram liczony z aktualnego ROI bieżącego obrazu. '
   if (params.binarization_method === 'manual') {
     note += `Linia pokazuje próg ręczny = ${params.manual_threshold}.`
   } else if (activeThresholdValue.value !== null) {
@@ -444,8 +536,8 @@ const pipelineSteps = computed(() => ([
   { id: 6, label: 'Wyniki' },
 ]))
 const activePipelineStep = computed(() => {
-  if (!file.value) return 1
-  return Math.min(6, currentStage.value + 1)
+  if (images.value.length === 0) return 1
+  return currentStage.value
 })
 
 const currentStageTitle = computed(() => {
@@ -470,9 +562,9 @@ const currentStageTitle = computed(() => {
 const currentStageDesc = computed(() => {
   switch (activePipelineStep.value) {
     case 1:
-      return 'Etap przygotowania obrazu: wgraj plik graficzny z dysku lub przeciągnij go do obszaru roboczego, aby rozpocząć proces analizy struktury porowatej.'
+      return 'Etap przygotowania obrazów: wgraj jeden lub wiele plików graficznych z dysku, aby rozpocząć proces zbiorczej analizy struktury porowatej.'
     case 2:
-      return 'Etap przygotowania: pozwala na zdefiniowanie obszaru zainteresowania (ROI) na obrazie wejściowym oraz wstępne dostosowanie jasności/kontrastu i filtrów wygładzających.'
+      return 'Etap przygotowania: pozwala na zdefiniowanie obszaru zainteresowania (ROI) na obrazie wejściowym oraz dostosowanie kontrastu i filtrów wygładzających.'
     case 3:
       return 'Etap kalibracji: zdefiniuj linię skali o znanej długości fizycznej, aby przeliczyć piksele na mikrometry (µm) lub milimetry (mm) dla pomiarów stereologicznych.'
     case 4:
@@ -487,19 +579,11 @@ const currentStageDesc = computed(() => {
 })
 
 function goToPipelineStep(step) {
-  if (step === 1) {
-    openFilePicker()
+  if (images.value.length === 0) {
+    error.value = 'Najpierw wgraj obrazy, aby przejsc dalej w workflow.'
     return
   }
-  if (!file.value) {
-    error.value = 'Najpierw wgraj obraz, aby przejsc dalej w workflow.'
-    return
-  }
-  if (step === 2) workflow.goToStage(1)
-  if (step === 3) workflow.goToStage(2)
-  if (step === 4) workflow.goToStage(3)
-  if (step === 5) workflow.goToStage(4)
-  if (step === 6) workflow.goToStage(5)
+  workflow.goToStage(step)
 }
 
 function setRoiToFullImage() {
@@ -510,12 +594,8 @@ function setRoiToFullImage() {
 function onDrop(e) {
   isDragging.value = false
   e.preventDefault()
-  const f = e.dataTransfer?.files?.[0]
-  if (f?.type?.startsWith('image/')) {
-    setFile(f)
-  } else {
-    error.value = 'Upuść poprawny plik obrazu (PNG, JPEG itp.).'
-  }
+  const filesList = Array.from(e.dataTransfer?.files || [])
+  addFiles(filesList)
 }
 
 function onDragOver(e) {
@@ -527,10 +607,11 @@ function onDragLeave() {
   isDragging.value = false
 }
 
-function onFileInput(event) {
-  const selected = event.target.files?.[0]
-  if (selected?.type?.startsWith('image/')) {
-    setFile(selected)
+async function onFileInput(event) {
+  const selected = Array.from(event.target.files || [])
+  await addFiles(selected)
+  if (fileInputRef.value) {
+    fileInputRef.value.value = ''
   }
 }
 
@@ -538,16 +619,205 @@ function openFilePicker() {
   fileInputRef.value?.click()
 }
 
-function setFile(f) {
-  file.value = f
+// Helper to load image natural dimensions asynchronously
+function loadImageDimensions(fileObj) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.onerror = () => {
+      resolve({ width: 0, height: 0 })
+    }
+    img.src = URL.createObjectURL(fileObj)
+  })
+}
+
+// Add files to lists
+async function addFiles(filesList) {
+  const imageFiles = filesList.filter(f => f.type?.startsWith('image/'))
+  if (imageFiles.length === 0) return
+
   error.value = null
-  result.value = null
-  localPreview.value = URL.createObjectURL(f)
-  params.roi = null
-  workflow.reset()
+
+  for (const f of imageFiles) {
+    const defaultParams = {
+      roi: null,
+      invert_roi: false,
+      contrast_percent: 100,
+      denoise_enabled: true,
+      denoise_method: 'median',
+      denoise_kernel_size: 5,
+      binarization_method: 'otsu',
+      manual_threshold: 120,
+      morph_open_iterations: 1,
+      morph_close_iterations: 1,
+    }
+
+    const dims = await loadImageDimensions(f)
+    
+    const newItem = {
+      id: Date.now() + Math.random(),
+      file: f,
+      name: f.name,
+      localPreview: URL.createObjectURL(f),
+      imageNatural: dims,
+      params: defaultParams,
+      scalePxLength: 0.0,
+      scalePhysicalValue: 20.0,
+      scaleUnit: 'µm',
+      scaleLineCoords: null,
+      measureLineCoords: null,
+      result: null,
+      shapeFactors: {
+        avgD1CircularityPerimeter: null,
+        avgD2CircularityArea: null,
+        avgEdgeIndicator: null,
+        avgShapeFactorRaw: null,
+        avgRoundnessEllipse: null,
+        avgMalinowskaFactor: null,
+      }
+    }
+
+    images.value.push(newItem)
+  }
+
+  // Switch to the first uploaded image if no image was active
+  if (activeImageIndex.value === -1 && images.value.length > 0) {
+    setActiveImage(0)
+  }
+}
+
+// Active image state management
+function setActiveImage(index) {
+  if (index < 0 || index >= images.value.length) return
+
+  saveActiveImageState()
+
+  activeImageIndex.value = index
+  const img = images.value[index]
+
+  file.value = img.file
+  result.value = img.result
+  localPreview.value = img.localPreview
+  imageNatural.width = img.imageNatural.width
+  imageNatural.height = img.imageNatural.height
+
+  Object.assign(params, img.params)
+
+  workflow.scalePxLength = img.scalePxLength
+  workflow.scalePhysicalValue = img.scalePhysicalValue
+  workflow.scaleUnit = img.scaleUnit
+  workflow.scaleLineCoords = img.scaleLineCoords ? { ...img.scaleLineCoords } : null
+  workflow.measureLineCoords = img.measureLineCoords ? { ...img.measureLineCoords } : null
+
   resetView()
   isSwapped.value = false
-  nextTick(computeImageAnalytics)
+}
+
+// Delete an image from list
+function deleteImage(index) {
+  if (index < 0 || index >= images.value.length) return
+
+  const deletedItem = images.value[index]
+  if (deletedItem.localPreview) {
+    URL.revokeObjectURL(deletedItem.localPreview)
+  }
+
+  images.value.splice(index, 1)
+
+  if (images.value.length === 0) {
+    activeImageIndex.value = -1
+    file.value = null
+    result.value = null
+    localPreview.value = null
+    imageNatural.width = 0
+    imageNatural.height = 0
+    Object.assign(params, {
+      roi: null,
+      invert_roi: false,
+      contrast_percent: 100,
+      denoise_enabled: true,
+      denoise_method: 'median',
+      denoise_kernel_size: 5,
+      binarization_method: 'otsu',
+      manual_threshold: 120,
+      morph_open_iterations: 1,
+      morph_close_iterations: 1,
+    })
+    workflow.reset()
+  } else {
+    if (activeImageIndex.value === index) {
+      const nextIdx = Math.min(index, images.value.length - 1)
+      activeImageIndex.value = -1
+      setActiveImage(nextIdx)
+    } else if (activeImageIndex.value > index) {
+      activeImageIndex.value--
+    }
+  }
+}
+
+// Save active state fields back to array
+function saveActiveImageState() {
+  const idx = activeImageIndex.value
+  if (idx >= 0 && idx < images.value.length) {
+    const img = images.value[idx]
+    img.params = { ...params }
+    img.file = file.value
+    img.result = result.value
+    img.localPreview = localPreview.value
+    img.imageNatural = { ...imageNatural }
+    img.scalePxLength = workflow.scalePxLength
+    img.scalePhysicalValue = workflow.scalePhysicalValue
+    img.scaleUnit = workflow.scaleUnit
+    img.scaleLineCoords = workflow.scaleLineCoords ? { ...workflow.scaleLineCoords } : null
+    img.measureLineCoords = workflow.measureLineCoords ? { ...workflow.measureLineCoords } : null
+  }
+}
+
+// Real-time synchronization watchers
+watch(params, (newParams) => {
+  const idx = activeImageIndex.value
+  if (idx >= 0 && idx < images.value.length) {
+    images.value[idx].params = { ...newParams }
+  }
+}, { deep: true })
+
+watch(() => ({
+  scalePxLength: workflow.scalePxLength,
+  scalePhysicalValue: workflow.scalePhysicalValue,
+  scaleUnit: workflow.scaleUnit,
+  scaleLineCoords: workflow.scaleLineCoords,
+  measureLineCoords: workflow.measureLineCoords,
+}), (newVal) => {
+  const idx = activeImageIndex.value
+  if (idx >= 0 && idx < images.value.length) {
+    const img = images.value[idx]
+    img.scalePxLength = newVal.scalePxLength
+    img.scalePhysicalValue = newVal.scalePhysicalValue
+    img.scaleUnit = newVal.scaleUnit
+    img.scaleLineCoords = newVal.scaleLineCoords ? { ...newVal.scaleLineCoords } : null
+    img.measureLineCoords = newVal.measureLineCoords ? { ...newVal.measureLineCoords } : null
+  }
+}, { deep: true })
+
+// Copy calibration parameter to all other files
+const scaleCopiedStatus = ref(false)
+function copyScaleToAll() {
+  if (activeImageIndex.value === -1) return
+  const activeImg = images.value[activeImageIndex.value]
+  images.value.forEach((img, idx) => {
+    if (idx !== activeImageIndex.value) {
+      img.scalePxLength = activeImg.scalePxLength
+      img.scalePhysicalValue = activeImg.scalePhysicalValue
+      img.scaleUnit = activeImg.scaleUnit
+      img.scaleLineCoords = activeImg.scaleLineCoords ? { ...activeImg.scaleLineCoords } : null
+    }
+  })
+  scaleCopiedStatus.value = true
+  setTimeout(() => {
+    scaleCopiedStatus.value = false
+  }, 3000)
 }
 
 function onImageLoaded(e) {
@@ -593,7 +863,7 @@ function clampToImageBounds(e) {
   const logicalW = imageRender.width
   const logicalH = imageRender.height
   if (!logicalW || !logicalH) return null
-  /** Po zoomie mapuj proporcjonalnie; gdy kursor jest poza prostokatem obrazu — przyklej do krawedzi overlay. */
+  
   const screenW = Math.max(rect.width, Number.EPSILON)
   const screenH = Math.max(rect.height, Number.EPSILON)
   const cx = Math.min(Math.max(e.clientX, rect.left), rect.right)
@@ -672,7 +942,7 @@ function beginRoiSelection(e) {
     return
   }
 
-  if (workflow.currentStage !== 1) {
+  if (workflow.currentStage !== 2) {
     if (view.zoom > 1) beginPan(e)
     return
   }
@@ -698,7 +968,7 @@ function beginRoiSelection(e) {
 }
 
 function beginMoveRoi(e) {
-  if (workflow.currentStage !== 1 || !displayedRoiBox.value) return
+  if (workflow.currentStage !== 2 || !displayedRoiBox.value) return
   if (e.button !== 0) return
   e.preventDefault()
   e.stopPropagation()
@@ -713,7 +983,7 @@ function beginMoveRoi(e) {
 }
 
 function beginResizeRoi(handle, e) {
-  if (workflow.currentStage !== 1 || !displayedRoiBox.value) return
+  if (workflow.currentStage !== 2 || !displayedRoiBox.value) return
   if (e.button !== 0) return
   e.preventDefault()
   e.stopPropagation()
@@ -1071,26 +1341,6 @@ function closeHelp() {
   helpOpen.value = false
 }
 
-function activateTool(tool) {
-  activeTool.value = tool
-  if (tool === 'Przytnij ROI') return
-  if (tool === 'Filtr medianowy') {
-    params.denoise_enabled = true
-    params.denoise_method = 'median'
-  }
-  if (tool === 'Progowanie') {
-    params.binarization_method = 'manual'
-    params.manual_threshold = Math.max(0, Math.min(255, params.manual_threshold))
-  }
-  if (tool === 'Wybór modelu') return
-  if (tool === 'Kontrast') {
-    params.contrast_percent = Math.max(50, Math.min(200, params.contrast_percent))
-  }
-  if (tool === 'Eksport') {
-    exportAnalysis()
-  }
-}
-
 async function checkHealth() {
   health.value = { status: 'checking', message: 'Sprawdzanie polaczenia...' }
   try {
@@ -1103,34 +1353,79 @@ async function checkHealth() {
   }
 }
 
+// Export aggregate JSON report
 function exportAnalysis() {
-  if (!result.value) {
-    error.value = 'Brak wyniku do eksportu. Najpierw uruchom analize.'
+  if (images.value.length === 0) {
+    error.value = 'Brak danych do eksportu.'
     return
   }
+  
+  const hasResults = images.value.every(img => img.result)
+  if (!hasResults) {
+    error.value = 'Nie wszystkie obrazy zostały przeanalizowane. Uruchom analizę.'
+    return
+  }
+
   const payload = {
+    project: 'Microstructure Multiple Image Analysis',
+    generated_at: new Date().toISOString(),
     model: selectedModel.value,
-    params: {
-      ...params,
-      scale_enabled: workflow.scalePxLength > 0,
-      scale_px_length: workflow.scalePxLength,
-      scale_physical_value: workflow.scalePhysicalValue,
+    summary_averages: {
+      pore_count: workflow.avgPoreCount,
+      aa_percent_porosity: workflow.avgAaPercent,
+      vv_percent_porosity: workflow.avgAaPercent, // V_V equals A_A in stereology
+      average_pore_area_physical: workflow.avgPoreArea,
+      pore_density_N_A: workflow.avgNa,
+      avg_d1_circularity_perimeter: workflow.avgD1CircularityPerimeter,
+      avg_d2_circularity_area: workflow.avgD2CircularityArea,
+      avg_edge_indicator: workflow.avgEdgeIndicator,
+      avg_shape_factor_raw: workflow.avgShapeFactorRaw,
+      avg_roundness_ellipse: workflow.avgRoundnessEllipse,
+      avg_malinowska_factor: workflow.avgMalinowskaFactor,
       scale_unit: workflow.scaleUnit,
     },
-    metrics: {
-      aa_percent: result.value.aa_percent,
-      pore_count: result.value.pore_count,
-      total_roi_area_physical: result.value.total_roi_area_physical,
-      average_pore_area_physical: result.value.average_pore_area_physical,
-      N_A: result.value.N_A,
-    },
-    generated_at: new Date().toISOString(),
+    images: images.value.map(img => ({
+      name: img.name,
+      scale: {
+        enabled: img.scalePxLength > 0,
+        px_length: img.scalePxLength,
+        physical_value: img.scalePhysicalValue,
+        unit: img.scaleUnit,
+      },
+      params: {
+        roi: img.params.roi,
+        invert_roi: img.params.invert_roi,
+        contrast_percent: img.params.contrast_percent,
+        denoise_enabled: img.params.denoise_enabled,
+        denoise_method: img.params.denoise_method,
+        denoise_kernel_size: img.params.denoise_kernel_size,
+        binarization_method: img.params.binarization_method,
+        manual_threshold: img.params.manual_threshold,
+        morph_open_iterations: img.params.morph_open_iterations,
+        morph_close_iterations: img.params.morph_close_iterations,
+      },
+      metrics: {
+        pore_count: img.result.pore_count,
+        aa_percent: img.result.aa_percent,
+        vv_percent: img.result.vv_percent,
+        total_roi_area_physical: img.result.total_roi_area_physical,
+        average_pore_area_physical: img.result.average_pore_area_physical,
+        N_A: img.result.N_A,
+        avg_d1_circularity_perimeter: img.result.avg_d1_circularity_perimeter,
+        avg_d2_circularity_area: img.result.avg_d2_circularity_area,
+        avg_edge_indicator: img.result.avg_edge_indicator,
+        avg_shape_factor_raw: img.result.avg_shape_factor_raw,
+        avg_roundness_ellipse: img.result.avg_roundness_ellipse,
+        avg_malinowska_factor: img.result.avg_malinowska_factor,
+      }
+    }))
   }
+  
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = 'wynik-analizy.json'
+  link.download = 'zbiorczy-raport-analizy.json'
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -1195,8 +1490,7 @@ function computeImageAnalytics() {
       else maxLum = Math.min(255, maxLum + 1)
     }
 
-    // Pad the range to at least 90% of the full scale (230 units) to limit zoom to max 10%
-    const minSpan = Math.round(255 * 0.9) // 230
+    const minSpan = Math.round(255 * 0.9)
     let minIntensityVal = minLum
     let maxIntensityVal = maxLum
     const currentSpan = maxIntensityVal - minIntensityVal
@@ -1350,39 +1644,105 @@ watch(() => view.zoom, () => {
   nextTick(updateImageRenderSize)
 })
 
+// Run concurrent analysis for all uploaded images
 async function runAnalysis() {
-  if (!file.value) {
-    error.value = 'Najpierw wgraj obraz.'
+  if (images.value.length === 0) {
+    error.value = 'Najpierw wgraj obrazy.'
     return
   }
   error.value = null
-  result.value = null
   loading.value = true
   isSwapped.value = false
 
-  try {
-    result.value = await analyzeImage(file.value, {
-      ...params,
-      stage: 4,
-      scale_enabled: workflow.scalePxLength > 0,
-      scale_px_length: workflow.scalePxLength,
-      scale_physical_value: workflow.scalePhysicalValue,
-      scale_unit: workflow.scaleUnit,
-    })
-    
-    // Save to Pinia store
-    workflow.avgD1CircularityPerimeter = result.value.avg_d1_circularity_perimeter
-    workflow.avgD2CircularityArea = result.value.avg_d2_circularity_area
-    workflow.avgEdgeIndicator = result.value.avg_edge_indicator
-    workflow.avgShapeFactorRaw = result.value.avg_shape_factor_raw
-    workflow.avgRoundnessEllipse = result.value.avg_roundness_ellipse
-    workflow.avgMalinowskaFactor = result.value.avg_malinowska_factor
+  saveActiveImageState()
 
-    workflow.goToStage(5)
+  try {
+    const analysisPromises = images.value.map(async (img) => {
+      const res = await analyzeImage(img.file, {
+        ...img.params,
+        stage: 4,
+        scale_enabled: img.scalePxLength > 0,
+        scale_px_length: img.scalePxLength,
+        scale_physical_value: img.scalePhysicalValue,
+        scale_unit: img.scaleUnit,
+      })
+      img.result = res
+      img.shapeFactors = {
+        avgD1CircularityPerimeter: res.avg_d1_circularity_perimeter,
+        avgD2CircularityArea: res.avg_d2_circularity_area,
+        avgEdgeIndicator: res.avg_edge_indicator,
+        avgShapeFactorRaw: res.avg_shape_factor_raw,
+        avgRoundnessEllipse: res.avg_roundness_ellipse,
+        avgMalinowskaFactor: res.avg_malinowska_factor,
+      }
+      return res
+    })
+
+    const results = await Promise.all(analysisPromises)
+
+    // Save result of the currently active image
+    if (activeImageIndex.value >= 0 && activeImageIndex.value < images.value.length) {
+      result.value = images.value[activeImageIndex.value].result
+    }
+
+    computeAverageMetrics(results)
+
+    workflow.goToStage(6) // go to Wyniki (step 6)
   } catch (e) {
     error.value = e.message || 'Analiza nie powiodła się.'
   } finally {
     loading.value = false
+  }
+}
+
+function computeAverageMetrics(results) {
+  if (!results || results.length === 0) return
+
+  const count = results.length
+  let totalAa = 0, totalPoreCount = 0
+  let totalRoiArea = 0, totalAvgPoreArea = 0, totalNa = 0
+  let totalD1 = 0, totalD2 = 0, totalEdge = 0, totalShape = 0, totalRoundness = 0, totalMalinowska = 0
+
+  let scaleCount = 0
+  results.forEach(res => {
+    totalAa += res.aa_percent
+    totalPoreCount += res.pore_count
+    
+    if (res.total_roi_area_physical !== null && res.total_roi_area_physical !== undefined) {
+      totalRoiArea += res.total_roi_area_physical
+      totalAvgPoreArea += res.average_pore_area_physical || 0
+      totalNa += res.N_A || 0
+      totalD1 += res.avg_d1_circularity_perimeter || 0
+      totalD2 += res.avg_d2_circularity_area || 0
+      totalShape += res.avg_shape_factor_raw || 0
+      scaleCount++
+    }
+
+    totalEdge += res.avg_edge_indicator || 0
+    totalRoundness += res.avg_roundness_ellipse || 0
+    totalMalinowska += res.avg_malinowska_factor || 0
+  })
+
+  workflow.avgAaPercent = totalAa / count
+  workflow.avgPoreCount = totalPoreCount / count
+  workflow.avgEdgeIndicator = totalEdge / count
+  workflow.avgRoundnessEllipse = totalRoundness / count
+  workflow.avgMalinowskaFactor = totalMalinowska / count
+
+  if (scaleCount > 0) {
+    workflow.avgTotalRoiArea = totalRoiArea / scaleCount
+    workflow.avgPoreArea = totalAvgPoreArea / scaleCount
+    workflow.avgNa = totalNa / scaleCount
+    workflow.avgD1CircularityPerimeter = totalD1 / scaleCount
+    workflow.avgD2CircularityArea = totalD2 / scaleCount
+    workflow.avgShapeFactorRaw = totalShape / scaleCount
+  } else {
+    workflow.avgTotalRoiArea = null
+    workflow.avgPoreArea = null
+    workflow.avgNa = null
+    workflow.avgD1CircularityPerimeter = null
+    workflow.avgD2CircularityArea = null
+    workflow.avgShapeFactorRaw = null
   }
 }
 
@@ -1394,7 +1754,7 @@ function downloadMask() {
   if (!maskDataUrl.value) return
   const link = document.createElement('a')
   link.href = maskDataUrl.value
-  link.download = 'maska-segmentacji.png'
+  link.download = `maska-segmentacji-${file.value?.name || 'obraz'}.png`
   link.click()
 }
 
@@ -1402,12 +1762,12 @@ function downloadRoiCrop() {
   if (!roiCropDataUrl.value) return
   const link = document.createElement('a')
   link.href = roiCropDataUrl.value
-  link.download = 'obszar-roi.png'
+  link.download = `obszar-roi-${file.value?.name || 'obraz'}.png`
   link.click()
 }
 
 function handlePrevStage() {
-  if (activePipelineStep.value <= 2) {
+  if (activePipelineStep.value <= 1) {
     openFilePicker()
   } else {
     goToPipelineStep(activePipelineStep.value - 1)
@@ -1420,3 +1780,96 @@ function handleNextStage() {
   }
 }
 </script>
+
+<style scoped>
+/* Sidebar image list for stage 1 (Obraz) */
+.sidebar-image-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface-2);
+}
+
+/* Custom premium scrollbar for sidebar image list */
+.sidebar-image-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-image-list::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 99px;
+}
+
+.sidebar-image-list::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 99px;
+}
+
+.sidebar-image-list::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.sidebar-image-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border: 1px solid var(--outline);
+  background: var(--surface-3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-image-item:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface-3));
+}
+
+.sidebar-image-item.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-3));
+  font-weight: 600;
+}
+
+.sidebar-image-name {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.sidebar-image-del {
+  background: transparent;
+  border: none;
+  color: var(--text-soft);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.sidebar-image-del:hover {
+  color: #ef4444;
+}
+
+.metric-toggle-group .toggle-btn {
+  font: 700 9px 'Space Grotesk', sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.metric-toggle-group .toggle-btn.active {
+  background: var(--primary) !important;
+  color: var(--primary-text) !important;
+  border-color: var(--primary) !important;
+}
+</style>

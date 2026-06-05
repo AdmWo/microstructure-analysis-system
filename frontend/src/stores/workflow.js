@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 
 const STAGES = [
-  { id: 1, key: 'preprocessing', title: 'Przetwarzanie wstępne' },
-  { id: 2, key: 'calibration', title: 'Kalibracja skali' },
-  { id: 3, key: 'binarization', title: 'Segmentacja (Binaryzacja)' },
-  { id: 4, key: 'featureAnalysis', title: 'Identyfikacja i analiza cech' },
-  { id: 5, key: 'interpretation', title: 'Interpretacja' },
+  { id: 1, key: 'image', title: 'Obraz' },
+  { id: 2, key: 'preprocessing', title: 'Przetwarzanie wstępne' },
+  { id: 3, key: 'calibration', title: 'Kalibracja skali' },
+  { id: 4, key: 'binarization', title: 'Segmentacja (Binaryzacja)' },
+  { id: 5, key: 'featureAnalysis', title: 'Identyfikacja i analiza cech' },
+  { id: 6, key: 'interpretation', title: 'Interpretacja / Wyniki' },
 ]
 
 export const useWorkflowStore = defineStore('workflow', {
@@ -18,6 +19,13 @@ export const useWorkflowStore = defineStore('workflow', {
     scaleUnit: 'µm', // 'µm' or 'mm'
     scaleLineCoords: null, // { startX, startY, endX, endY } in natural image space
     measureLineCoords: null, // { startX, startY, endX, endY } in natural image space
+    // Average values across all images
+    avgAaPercent: null,
+    avgPoreCount: null,
+    avgTotalRoiArea: null,
+    avgPoreArea: null,
+    avgNa: null,
+    // Active image or single image metrics
     avgD1CircularityPerimeter: null,
     avgD2CircularityArea: null,
     avgEdgeIndicator: null,
@@ -49,6 +57,11 @@ export const useWorkflowStore = defineStore('workflow', {
       this.scaleUnit = 'µm'
       this.scaleLineCoords = null
       this.measureLineCoords = null
+      this.avgAaPercent = null
+      this.avgPoreCount = null
+      this.avgTotalRoiArea = null
+      this.avgPoreArea = null
+      this.avgNa = null
       this.avgD1CircularityPerimeter = null
       this.avgD2CircularityArea = null
       this.avgEdgeIndicator = null
@@ -58,3 +71,4 @@ export const useWorkflowStore = defineStore('workflow', {
     },
   },
 })
+

@@ -1,197 +1,285 @@
 <template>
   <section class="viewer-shell" @drop="emit('drop', $event)" @dragover="emit('dragover', $event)" @dragleave="emit('dragleave')">
-    <div v-if="!roiDataUrl" class="viewer-overlay">
-      <p>{{ isDragging ? 'Upusc obraz, aby rozpoczac analize' : 'Wgraj obraz mikroskopowy, aby zaczac' }}</p>
-      <button type="button" @click="emit('open-file-picker')">Wybierz obraz</button>
+    <!-- Thumbnail toggle button (floating in top left) -->
+    <button
+      v-if="images && images.length > 0 && currentStage > 1"
+      type="button"
+      class="thumbnail-toggle-trigger"
+      @click="showThumbnailStrip = !showThumbnailStrip"
+      :title="showThumbnailStrip ? 'Ukryj listę zdjęć' : 'Pokaż listę zdjęć'"
+    >
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+        <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z" />
+      </svg>
+      <span>{{ showThumbnailStrip ? 'Ukryj zdjęcia' : 'Zdjęcia' }}</span>
+    </button>
+
+    <!-- STAGE 1: Grid Gallery View -->
+    <div v-if="currentStage === 1 && images && images.length > 0" class="viewer-grid-mode">
+      <div class="grid-header">
+        <h3>Lista obrazów do analizy ({{ images.length }})</h3>
+        <button type="button" class="btn primary add-btn-top" @click="emit('open-file-picker')">
+          Dodaj obrazy
+        </button>
+      </div>
+      <div class="images-gallery-grid">
+        <div
+          v-for="(img, index) in images"
+          :key="img.id"
+          class="gallery-card"
+          :class="{ active: index === activeImageIndex }"
+          @click="emit('select-image', index)"
+        >
+          <div class="gallery-preview-wrap">
+            <img :src="img.localPreview" class="gallery-img" />
+            <div
+              v-if="img.params?.roi && img.imageNatural?.width && img.imageNatural?.height"
+              class="gallery-roi-outline"
+              :style="getRoiOutlineStyle(img)"
+            ></div>
+            <button type="button" class="gallery-card-delete-btn" @click.stop="emit('delete-image', index)" title="Usuń obraz">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="gallery-card-info">
+            <span class="gallery-card-name" :title="img.name">{{ img.name }}</span>
+            <span class="gallery-card-status" :class="{ 'has-result': img.result }">
+              {{ img.result ? 'Przeanalizowano' : 'Gotowy do analizy' }}
+            </span>
+          </div>
+        </div>
+        <div class="gallery-card add-card" @click="emit('open-file-picker')">
+          <span class="add-icon">+</span>
+          <span class="add-text">Dodaj zdjęcia</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty Drop-zone Overlay -->
+    <div v-else-if="!roiDataUrl" class="viewer-overlay">
+      <p>{{ isDragging ? 'Upusc obrazy, aby rozpoczac analize' : 'Wgraj obrazy mikroskopowe, aby zaczac' }}</p>
+      <button type="button" @click="emit('open-file-picker')">Wybierz obrazy</button>
       <p v-if="error" class="error-text">{{ error }}</p>
     </div>
 
-    <div v-else class="stitch-image-frame-wrap" @wheel.prevent="emit('wheel-image', $event)">
-      <div class="stitch-image-frame" :style="frameStyle">
-        <img
-          :src="mainImageSrc"
-          alt="Mikrostruktura"
-          class="main-image"
-          draggable="false"
-          :style="{ filter: baseImageFilter }"
-          @load="emit('image-load', $event)"
-        />
-        <div v-if="displayedRoiBox && !isSwapped" class="roi-live-invert-layer" :style="roiInvertClipStyle">
-          <img :src="roiDataUrl" alt="" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%)${invertRoi ? ' invert(100%)' : ''}` }" aria-hidden="true" />
-        </div>
-        <div
-          class="roi-overlay"
-          :class="overlayClass"
-          @mousedown="emit('begin-roi', $event)"
-        >
-          <div
-            v-if="displayedRoiBox"
-            class="roi-box"
-            :class="roiBoxClass"
-            :style="{ left: `${displayedRoiBox.left}px`, top: `${displayedRoiBox.top}px`, width: `${displayedRoiBox.width}px`, height: `${displayedRoiBox.height}px` }"
-            @mousedown="handleRoiMouseDown"
-          >
-            <img
-              v-if="isSwapped && maskDataUrl"
-              :src="maskDataUrl"
-              alt="Maska"
-              draggable="false"
-              style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1;"
-            />
-            <span
-              v-if="canEditRoi"
-              v-for="handle in HANDLES"
-              :key="handle"
-              class="roi-handle"
-              :class="`handle-${handle}`"
-              @mousedown.stop="emit('begin-resize-roi', handle, $event)"
-            />
+    <!-- STAGES 2-6: Editor / Result Canvas View -->
+    <template v-else>
+      <div class="stitch-image-frame-wrap" @wheel.prevent="emit('wheel-image', $event)">
+        <div class="stitch-image-frame" :style="frameStyle">
+          <img
+            :src="mainImageSrc"
+            alt="Mikrostruktura"
+            class="main-image"
+            draggable="false"
+            :style="{ filter: baseImageFilter }"
+            @load="emit('image-load', $event)"
+          />
+          <div v-if="displayedRoiBox && !isSwapped" class="roi-live-invert-layer" :style="roiInvertClipStyle">
+            <img :src="roiDataUrl" alt="" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%)${invertRoi ? ' invert(100%)' : ''}` }" aria-hidden="true" />
           </div>
           <div
-            v-if="drawing.active || (drawing.width && drawing.height)"
-            class="roi-box drawing"
-            :style="{ left: `${drawing.x}px`, top: `${drawing.y}px`, width: `${drawing.width}px`, height: `${drawing.height}px` }"
+            class="roi-overlay"
+            :class="overlayClass"
+            @mousedown="emit('begin-roi', $event)"
+          >
+            <div
+              v-if="displayedRoiBox"
+              class="roi-box"
+              :class="roiBoxClass"
+              :style="{ left: `${displayedRoiBox.left}px`, top: `${displayedRoiBox.top}px`, width: `${displayedRoiBox.width}px`, height: `${displayedRoiBox.height}px` }"
+              @mousedown="handleRoiMouseDown"
+            >
+              <img
+                v-if="isSwapped && maskDataUrl"
+                :src="maskDataUrl"
+                alt="Maska"
+                draggable="false"
+                style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1;"
+              />
+              <span
+                v-if="canEditRoi"
+                v-for="handle in HANDLES"
+                :key="handle"
+                class="roi-handle"
+                :class="`handle-${handle}`"
+                @mousedown.stop="emit('begin-resize-roi', handle, $event)"
+              />
+            </div>
+            <div
+              v-if="drawing.active || (drawing.width && drawing.height)"
+              class="roi-box drawing"
+              :style="{ left: `${drawing.x}px`, top: `${drawing.y}px`, width: `${drawing.width}px`, height: `${drawing.height}px` }"
+            />
+          </div>
+
+          <!-- Scale Calibration & Measurement SVG Overlay -->
+          <svg
+            v-if="activeLineGeom || measureLineGeom"
+            class="scale-calibration-svg"
+            style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"
+          >
+            <!-- Calibration line group -->
+            <g v-if="activeLineGeom">
+              <line
+                :x1="activeLineGeom.line.x1"
+                :y1="activeLineGeom.line.y1"
+                :x2="activeLineGeom.line.x2"
+                :y2="activeLineGeom.line.y2"
+                stroke="#00ffff"
+                stroke-width="2.5"
+              />
+              <line
+                v-if="activeLineGeom.startTick"
+                :x1="activeLineGeom.startTick.x1"
+                :y1="activeLineGeom.startTick.y1"
+                :x2="activeLineGeom.startTick.x2"
+                :y2="activeLineGeom.startTick.y2"
+                stroke="#00ffff"
+                stroke-width="2.5"
+              />
+              <line
+                v-if="activeLineGeom.endTick"
+                :x1="activeLineGeom.endTick.x1"
+                :y1="activeLineGeom.endTick.y1"
+                :x2="activeLineGeom.endTick.x2"
+                :y2="activeLineGeom.endTick.y2"
+                stroke="#00ffff"
+                stroke-width="2.5"
+              />
+              <g>
+                <rect
+                  :x="activeLineGeom.cx - activeLineGeom.labelWidth / 2"
+                  :y="activeLineGeom.cy - 22"
+                  :width="activeLineGeom.labelWidth"
+                  height="18"
+                  rx="4"
+                  fill="rgba(15, 23, 42, 0.85)"
+                  stroke="#00ffff"
+                  stroke-width="1"
+                />
+                <text
+                  :x="activeLineGeom.cx"
+                  :y="activeLineGeom.cy - 13"
+                  fill="#00ffff"
+                  font-size="10"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="600"
+                  text-anchor="middle"
+                  dominant-baseline="central"
+                >
+                  {{ activeLineGeom.label }}
+                </text>
+              </g>
+            </g>
+
+            <!-- Measurement line group -->
+            <g v-if="measureLineGeom">
+              <line
+                :x1="measureLineGeom.line.x1"
+                :y1="measureLineGeom.line.y1"
+                :x2="measureLineGeom.line.x2"
+                :y2="measureLineGeom.line.y2"
+                stroke="#ff9f00"
+                stroke-width="2"
+              />
+              <line
+                v-if="measureLineGeom.startTick"
+                :x1="measureLineGeom.startTick.x1"
+                :y1="measureLineGeom.startTick.y1"
+                :x2="measureLineGeom.startTick.x2"
+                :y2="measureLineGeom.startTick.y2"
+                stroke="#ff9f00"
+                stroke-width="2"
+              />
+              <line
+                v-if="measureLineGeom.endTick"
+                :x1="measureLineGeom.endTick.x1"
+                :y1="measureLineGeom.endTick.y1"
+                :x2="measureLineGeom.endTick.x2"
+                :y2="measureLineGeom.endTick.y2"
+                stroke="#ff9f00"
+                stroke-width="2"
+              />
+              <g>
+                <rect
+                  :x="measureLineGeom.cx - measureLineGeom.labelWidth / 2"
+                  :y="measureLineGeom.cy - 22"
+                  :width="measureLineGeom.labelWidth"
+                  height="18"
+                  rx="4"
+                  fill="rgba(15, 23, 42, 0.85)"
+                  stroke="#ff9f00"
+                  stroke-width="1"
+                />
+                <text
+                  :x="measureLineGeom.cx"
+                  :y="measureLineGeom.cy - 13"
+                  fill="#ff9f00"
+                  font-size="10"
+                  font-family="Inter, system-ui, sans-serif"
+                  font-weight="600"
+                  text-anchor="middle"
+                  dominant-baseline="central"
+                >
+                  {{ measureLineGeom.label }}
+                </text>
+              </g>
+            </g>
+          </svg>
+
+          <!-- Measurement line handles (grab points) -->
+          <div
+            v-if="displayedMeasureLine"
+            class="measure-handle start-handle"
+            :style="{ left: `${displayedMeasureLine.startX}px`, top: `${displayedMeasureLine.startY}px` }"
+            @mousedown.stop="emit('begin-resize-measure', 'start', $event)"
+          />
+          <div
+            v-if="displayedMeasureLine"
+            class="measure-handle end-handle"
+            :style="{ left: `${displayedMeasureLine.endX}px`, top: `${displayedMeasureLine.endY}px` }"
+            @mousedown.stop="emit('begin-resize-measure', 'end', $event)"
           />
         </div>
-
-        <!-- Scale Calibration & Measurement SVG Overlay -->
-        <svg
-          v-if="activeLineGeom || measureLineGeom"
-          class="scale-calibration-svg"
-          style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"
-        >
-          <!-- Calibration line group -->
-          <g v-if="activeLineGeom">
-            <line
-              :x1="activeLineGeom.line.x1"
-              :y1="activeLineGeom.line.y1"
-              :x2="activeLineGeom.line.x2"
-              :y2="activeLineGeom.line.y2"
-              stroke="#00ffff"
-              stroke-width="2.5"
-            />
-            <line
-              v-if="activeLineGeom.startTick"
-              :x1="activeLineGeom.startTick.x1"
-              :y1="activeLineGeom.startTick.y1"
-              :x2="activeLineGeom.startTick.x2"
-              :y2="activeLineGeom.startTick.y2"
-              stroke="#00ffff"
-              stroke-width="2.5"
-            />
-            <line
-              v-if="activeLineGeom.endTick"
-              :x1="activeLineGeom.endTick.x1"
-              :y1="activeLineGeom.endTick.y1"
-              :x2="activeLineGeom.endTick.x2"
-              :y2="activeLineGeom.endTick.y2"
-              stroke="#00ffff"
-              stroke-width="2.5"
-            />
-            <g>
-              <rect
-                :x="activeLineGeom.cx - activeLineGeom.labelWidth / 2"
-                :y="activeLineGeom.cy - 22"
-                :width="activeLineGeom.labelWidth"
-                height="18"
-                rx="4"
-                fill="rgba(15, 23, 42, 0.85)"
-                stroke="#00ffff"
-                stroke-width="1"
-              />
-              <text
-                :x="activeLineGeom.cx"
-                :y="activeLineGeom.cy - 13"
-                fill="#00ffff"
-                font-size="10"
-                font-family="Inter, system-ui, sans-serif"
-                font-weight="600"
-                text-anchor="middle"
-                dominant-baseline="central"
-              >
-                {{ activeLineGeom.label }}
-              </text>
-            </g>
-          </g>
-
-          <!-- Measurement line group -->
-          <g v-if="measureLineGeom">
-            <line
-              :x1="measureLineGeom.line.x1"
-              :y1="measureLineGeom.line.y1"
-              :x2="measureLineGeom.line.x2"
-              :y2="measureLineGeom.line.y2"
-              stroke="#ff9f00"
-              stroke-width="2"
-            />
-            <line
-              v-if="measureLineGeom.startTick"
-              :x1="measureLineGeom.startTick.x1"
-              :y1="measureLineGeom.startTick.y1"
-              :x2="measureLineGeom.startTick.x2"
-              :y2="measureLineGeom.startTick.y2"
-              stroke="#ff9f00"
-              stroke-width="2"
-            />
-            <line
-              v-if="measureLineGeom.endTick"
-              :x1="measureLineGeom.endTick.x1"
-              :y1="measureLineGeom.endTick.y1"
-              :x2="measureLineGeom.endTick.x2"
-              :y2="measureLineGeom.endTick.y2"
-              stroke="#ff9f00"
-              stroke-width="2"
-            />
-            <g>
-              <rect
-                :x="measureLineGeom.cx - measureLineGeom.labelWidth / 2"
-                :y="measureLineGeom.cy - 22"
-                :width="measureLineGeom.labelWidth"
-                height="18"
-                rx="4"
-                fill="rgba(15, 23, 42, 0.85)"
-                stroke="#ff9f00"
-                stroke-width="1"
-              />
-              <text
-                :x="measureLineGeom.cx"
-                :y="measureLineGeom.cy - 13"
-                fill="#ff9f00"
-                font-size="10"
-                font-family="Inter, system-ui, sans-serif"
-                font-weight="600"
-                text-anchor="middle"
-                dominant-baseline="central"
-              >
-                {{ measureLineGeom.label }}
-              </text>
-            </g>
-          </g>
-        </svg>
-
-        <!-- Measurement line handles (grab points) -->
-        <div
-          v-if="displayedMeasureLine"
-          class="measure-handle start-handle"
-          :style="{ left: `${displayedMeasureLine.startX}px`, top: `${displayedMeasureLine.startY}px` }"
-          @mousedown.stop="emit('begin-resize-measure', 'start', $event)"
-        />
-        <div
-          v-if="displayedMeasureLine"
-          class="measure-handle end-handle"
-          :style="{ left: `${displayedMeasureLine.endX}px`, top: `${displayedMeasureLine.endY}px` }"
-          @mousedown.stop="emit('begin-resize-measure', 'end', $event)"
-        />
       </div>
-    </div>
+
+      <!-- Bottom Thumbnail Strip (Active in Stages 2-6) -->
+      <div v-if="images && images.length > 0" class="viewer-thumbnail-strip" :class="{ visible: showThumbnailStrip }">
+        <div
+          v-for="(img, index) in images"
+          :key="img.id"
+          class="thumbnail-card"
+          :class="{ active: index === activeImageIndex }"
+          @click="emit('select-image', index)"
+        >
+          <div class="thumbnail-preview-container">
+            <img :src="img.localPreview" class="thumbnail-img" />
+            <div
+              v-if="img.params?.roi && img.imageNatural?.width && img.imageNatural?.height"
+              class="thumbnail-roi-outline"
+              :style="getRoiOutlineStyle(img)"
+            ></div>
+          </div>
+          <span class="thumbnail-name" :title="img.name">{{ img.name }}</span>
+          <button type="button" class="thumbnail-delete-btn" @click.stop="emit('delete-image', index)" title="Usuń obraz">×</button>
+        </div>
+        <div class="thumbnail-card add-card" @click="emit('open-file-picker')">
+          <span class="add-icon">+</span>
+          <span class="add-text">Dodaj</span>
+        </div>
+      </div>
+    </template>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useWorkflowStore } from '../../stores/workflow'
 
 const workflow = useWorkflowStore()
+const showThumbnailStrip = ref(false)
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
@@ -222,6 +310,10 @@ const props = defineProps({
   // Distance measurement props
   measureLineCoords: { type: Object, default: null },
   measureDrawing: { type: Object, default: null },
+
+  // Multiple images props
+  images: { type: Array, default: () => [] },
+  activeImageIndex: { type: Number, default: -1 },
 })
 
 const emit = defineEmits([
@@ -235,6 +327,8 @@ const emit = defineEmits([
   'begin-resize-roi',
   'begin-resize-measure',
   'open-file-picker',
+  'select-image',
+  'delete-image',
 ])
 
 const mainImageSrc = computed(() => {
@@ -302,7 +396,7 @@ const displayedScaleLine = computed(() => {
 })
 
 const activeLineGeom = computed(() => {
-  if (props.currentStage !== 2) return null
+  if (props.currentStage !== 3) return null // Step 3 is scale calibration
   let line = null
   let isDrawing = false
   if (props.scaleDrawing && props.scaleDrawing.active) {
@@ -477,4 +571,416 @@ function handleRoiMouseDown(e) {
     emit('begin-move-roi', e)
   }
 }
+
+function getRoiOutlineStyle(img) {
+  if (!img.params || !img.params.roi || !img.imageNatural?.width || !img.imageNatural?.height) return {}
+  const { x, y, width, height } = img.params.roi
+  const w = img.imageNatural.width
+  const h = img.imageNatural.height
+  return {
+    left: `${(x / w) * 100}%`,
+    top: `${(y / h) * 100}%`,
+    width: `${(width / w) * 100}%`,
+    height: `${(height / h) * 100}%`,
+  }
+}
 </script>
+
+<style scoped>
+/* StitchViewer component styles */
+.viewer-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.stitch-image-frame-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.viewer-grid-mode {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #09090b;
+}
+
+.grid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.grid-header h3 {
+  margin: 0;
+  font: 700 16px 'Space Grotesk', sans-serif;
+  color: #fff;
+}
+
+.add-btn-top {
+  font-size: 11px;
+  padding: 6px 14px;
+}
+
+.images-gallery-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+@media (max-width: 1200px) {
+  .images-gallery-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .images-gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.gallery-card {
+  position: relative;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+}
+
+.gallery-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.gallery-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, #18181b);
+}
+
+.gallery-card.add-card {
+  border: 1px dashed #3c494e;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: 120px;
+  gap: 8px;
+}
+
+.gallery-card.add-card:hover {
+  border-style: solid;
+  border-color: var(--primary);
+}
+
+.gallery-card.add-card .add-icon {
+  font-size: 24px;
+  color: var(--text-soft);
+  font-weight: bold;
+}
+
+.gallery-card.add-card .add-text {
+  font-size: 10px;
+  color: var(--text-soft);
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.gallery-card.add-card:hover .add-icon,
+.gallery-card.add-card:hover .add-text {
+  color: var(--primary);
+}
+
+.gallery-preview-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/10;
+  background: #09090b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.gallery-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.gallery-roi-outline {
+  position: absolute;
+  border: 2px solid #ef4444; /* red ROI border */
+  background-color: rgba(239, 68, 68, 0.20);
+  box-sizing: border-box;
+}
+
+.gallery-card-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.gallery-card:hover .gallery-card-delete-btn {
+  opacity: 1;
+}
+
+.gallery-card-delete-btn:hover {
+  background: #ef4444;
+}
+
+.gallery-card-info {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gallery-card-name {
+  font-size: 11px;
+  color: #f4f4f5;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-card-status {
+  font-size: 9px;
+  color: #71717a;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.gallery-card-status.has-result {
+  color: #10b981;
+}
+
+/* Thumbnail strip styles */
+.viewer-thumbnail-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 110;
+  background: rgba(18, 18, 20, 0.82);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  height: 120px;
+  min-height: 120px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.45) rgba(255, 255, 255, 0.08);
+}
+
+.viewer-thumbnail-strip.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.thumbnail-card {
+  position: relative;
+  width: 90px;
+  height: 95px;
+  min-width: 90px;
+  background: #1c1c1f;
+  border: 1px solid #3c494e;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.thumbnail-card:hover {
+  border-color: var(--primary);
+  background: #232328;
+}
+
+.thumbnail-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, #1c1c1f);
+}
+
+.thumbnail-preview-container {
+  position: relative;
+  width: 100%;
+  height: 55px;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumbnail-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.thumbnail-roi-outline {
+  position: absolute;
+  border: 1.5px solid #ef4444; /* red ROI border */
+  background-color: rgba(239, 68, 68, 0.20);
+  box-sizing: border-box;
+}
+
+.thumbnail-name {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.95);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.thumbnail-delete-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  font-size: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.thumbnail-card:hover .thumbnail-delete-btn {
+  opacity: 1;
+}
+
+.thumbnail-card.add-card {
+  border: 1px dashed #3c494e;
+  background: transparent;
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 4px;
+}
+
+.add-icon {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--text-soft);
+}
+
+.add-text {
+  font-size: 9px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.thumbnail-card.add-card:hover .add-icon,
+.thumbnail-card.add-card:hover .add-text {
+  color: var(--primary);
+}
+
+/* Floating toggle trigger button */
+.thumbnail-toggle-trigger {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 120;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 10px 'Space Grotesk', sans-serif;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+}
+
+.thumbnail-toggle-trigger:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+  box-shadow: 0 4px 12px rgba(0, 209, 255, 0.25);
+}
+
+/* Custom premium scrollbar for filmstrip */
+.viewer-thumbnail-strip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.viewer-thumbnail-strip::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+}
+
+.viewer-thumbnail-strip::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 99px;
+}
+
+.viewer-thumbnail-strip::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+</style>
