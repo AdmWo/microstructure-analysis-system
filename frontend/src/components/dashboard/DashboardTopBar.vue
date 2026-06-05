@@ -21,3 +21,72 @@ defineProps({
 
 const emit = defineEmits(['toggle-theme', 'open-help'])
 </script>
+
+<style scoped>
+.stitch-topbar {
+  height: 56px;
+  border-bottom: 1px solid #1c1c1f;
+  background: #121214;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--outline);
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.brand-title {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.top-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.top-nav-item {
+  background: transparent;
+  border: 0;
+  color: #7b8189;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font: 700 11px/1 'Space Grotesk', sans-serif;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.top-nav-item.active {
+  color: #00d1ff;
+  border-bottom: 2px solid #00d1ff;
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.top-icons {
+  display: flex;
+  gap: 12px;
+  color: #97a3aa;
+}
+
+.top-icons .icon-btn {
+  border: 1px solid var(--outline);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font: 600 11px/1 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+</style>

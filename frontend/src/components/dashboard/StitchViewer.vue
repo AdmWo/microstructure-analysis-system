@@ -983,4 +983,225 @@ function getRoiOutlineStyle(img) {
 .viewer-thumbnail-strip::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.75);
 }
-</style>
+</style>
+
+<style>
+.image-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.image-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.image-tools .btn {
+  min-width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.zoom-value {
+  min-width: 3rem;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.image-stage {
+  position: relative;
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: var(--image-stage-bg);
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0.2rem;
+}
+
+.viewer-shell {
+  position: relative;
+  border: 1px solid #3c494e;
+  background: #0e0e0f;
+  min-height: 0;
+  overflow: hidden;
+  border-color: var(--outline);
+}
+
+.stitch-dashboard.theme-light .viewer-shell {
+  background: #f2f4f6;
+}
+
+.viewer-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-muted);
+  color: var(--text-soft);
+}
+
+.viewer-overlay button {
+  margin: 0 auto;
+  border: 1px solid #00d1ff;
+  background: transparent;
+  color: #00d1ff;
+  padding: 8px 12px;
+  border-color: var(--primary);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.main-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+.empty-image {
+  color: #cbd5e1;
+}
+
+.roi-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+}
+
+.image-stage:not(.cropEnabled) .roi-overlay {
+  cursor: default;
+}
+
+.roi-box {
+  position: absolute;
+  border: 2px dashed #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  pointer-events: auto;
+}
+
+.roi-box.drawing {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.16);
+  pointer-events: none;
+}
+
+.roi-live-invert-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.roi-handle {
+  position: absolute;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #fff;
+  background: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+  pointer-events: auto;
+  z-index: 3;
+}
+
+.handle-nw { left: -0.375rem; top: -0.375rem; cursor: nwse-resize; }
+.handle-n  { left: calc(50% - 0.375rem); top: -0.375rem; cursor: ns-resize; }
+.handle-ne { right: -0.375rem; top: -0.375rem; cursor: nesw-resize; }
+.handle-e  { right: -0.375rem; top: calc(50% - 0.375rem); cursor: ew-resize; }
+.handle-se { right: -0.375rem; bottom: -0.375rem; cursor: nwse-resize; }
+.handle-s  { left: calc(50% - 0.375rem); bottom: -0.375rem; cursor: ns-resize; }
+.handle-sw { left: -0.375rem; bottom: -0.375rem; cursor: nesw-resize; }
+.handle-w  { left: -0.375rem; top: calc(50% - 0.375rem); cursor: ew-resize; }
+
+.crop-lock {
+  position: absolute;
+  right: 0.45rem;
+  top: 0.45rem;
+  font-size: 0.6rem;
+  padding: 0.1rem 0.28rem;
+  border-radius: 0.4rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+}
+
+.viewer-meta {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.viewer-meta > div {
+  background: rgba(32, 31, 32, 0.78);
+  border: 1px solid #3c494e;
+  padding: 4px 8px;
+  color: #ffffff;
+  font: 500 11px/1.3 'Space Grotesk', sans-serif;
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  border-color: var(--outline);
+  color: var(--text);
+}
+
+.roi-overlay.cursor-pencil-cyan,
+.roi-box.cursor-pencil-cyan {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300d1ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/><path d='m15 5 4 4'/></svg>") 2 22, crosshair;
+}
+.roi-overlay.cursor-pencil-orange,
+.roi-box.cursor-pencil-orange {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ff9f00' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/><path d='m15 5 4 4'/></svg>") 2 22, crosshair;
+}
+.roi-overlay.cursor-crosshair {
+  cursor: crosshair;
+}
+
+.roi-box.cursor-move {
+  cursor: move;
+}
+.roi-box.cursor-crosshair {
+  cursor: crosshair;
+}
+
+.measure-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+  background: #ff9f00;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  z-index: 12;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+}
+.measure-handle:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+  background: #ffa81a;
+  cursor: grabbing;
+}
+</style>

@@ -336,3 +336,130 @@ function onTooltipMouseLeave() {
   tooltip.visible = false
 }
 </script>
+
+<style scoped>
+.metrics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 6px;
+  padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface);
+}
+
+.metrics-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.metrics-panel::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+.metrics-panel::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 3px;
+}
+.metrics-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.metric-card {
+  border: 1px solid var(--outline);
+  background: var(--surface-2);
+  padding: 10px;
+}
+
+.metric-card h4 {
+  color: var(--text-muted);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  font: 700 10px/1 'Space Grotesk', sans-serif;
+}
+
+.metric-group {
+  margin-top: 10px;
+  border-top: 1px solid var(--outline);
+  padding-top: 10px;
+}
+
+.metric-group:first-of-type {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.metric-group-title {
+  margin: 0 0 8px;
+  color: var(--primary);
+  text-transform: uppercase;
+  font: 700 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: 500 12px/1.4 'Space Grotesk', sans-serif;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+
+.metric-row strong {
+  color: var(--text);
+}
+
+.tooltip-trigger {
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+  transition: color 0.15s ease, border-bottom-color 0.15s ease;
+}
+
+.tooltip-trigger:hover {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.metric-row span[title] {
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+}
+
+.mask-image {
+  width: 100%;
+  border: 1px solid var(--outline);
+  background: #0e0e0f;
+}
+
+.retry-health {
+  margin-left: auto;
+  border: 1px solid var(--outline);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font: 600 10px/1 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .metrics-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metrics-panel .status {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .metrics-panel {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
