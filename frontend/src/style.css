@@ -1131,7 +1131,7 @@ select {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: var(--surface);
+  background: var(--surface-2);
 }
 
 .stage-info-title {
@@ -1417,27 +1417,38 @@ select {
   gap: 10px;
   height: 100%;
   box-sizing: border-box;
+}
+
+.metrics-panel,
+.stitch-side-nav {
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface);
+}
+
+.metrics-panel::-webkit-scrollbar,
+.stitch-side-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.metrics-panel::-webkit-scrollbar-track,
+.stitch-side-nav::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+.metrics-panel::-webkit-scrollbar-thumb,
+.stitch-side-nav::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 3px;
+}
+.metrics-panel::-webkit-scrollbar-thumb:hover,
+.stitch-side-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.metrics-panel {
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--outline);
   border-radius: 6px;
   padding: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--outline) var(--surface);
-}
-
-.metrics-panel::-webkit-scrollbar {
-  width: 6px;
-}
-.metrics-panel::-webkit-scrollbar-track {
-  background: var(--surface);
-}
-.metrics-panel::-webkit-scrollbar-thumb {
-  background: var(--outline);
-  border-radius: 3px;
-}
-.metrics-panel::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
 }
 
 .metric-card {

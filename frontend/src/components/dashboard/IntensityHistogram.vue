@@ -9,7 +9,7 @@
         style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; transition: color 0.2s;"
         :title="isThinner ? 'Zmień słupki na grubsze' : 'Zmień słupki na cieńsze'"
       >
-        <svg v-if="isThinner" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <svg v-if="!isThinner" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
           <rect x="2" y="4" width="5" height="16" rx="1" />
           <rect x="9" y="4" width="5" height="16" rx="1" />
           <rect x="16" y="4" width="5" height="16" rx="1" />
@@ -30,13 +30,21 @@
         :class="{ editable: isThresholdEditable }"
         @mousedown="startDrag"
       >
-        <div
-          class="bars"
-          :class="{ thinner: isThinner }"
-          :style="{ gridTemplateColumns: `repeat(${histogramBins.length}, minmax(0, 1fr))` }"
+        <svg
+          class="bars-svg"
+          :viewBox="isThinner ? '0 0 480 100' : '0 0 240 100'"
+          preserveAspectRatio="none"
         >
-          <span v-for="(h, idx) in histogramBins" :key="idx" :style="{ height: `${h}%` }" />
-        </div>
+          <rect
+            v-for="(h, idx) in histogramBins"
+            :key="idx"
+            :x="idx * 10 + 1"
+            :y="100 - h"
+            width="8"
+            :height="h"
+            rx="1"
+          />
+        </svg>
         <div
           v-if="ghostThresholdPercent !== null"
           class="threshold-line ghost-line"
@@ -215,28 +223,14 @@ onBeforeUnmount(() => {
   cursor: col-resize;
 }
 
-.bars {
+.bars-svg {
+  width: 100%;
   height: 100%;
-  display: grid;
-  grid-template-columns: repeat(24, minmax(0, 1fr));
-  align-items: end;
-  gap: 2px;
-  padding: 0 2px;
-  box-sizing: border-box;
-}
-
-.bars.thinner {
-  gap: 1px;
-  padding: 0 1px;
-}
-
-.bars.thinner span {
-  border-radius: 1px;
-}
-
-.bars span {
   display: block;
-  background: color-mix(in srgb, var(--primary) 65%, transparent);
+}
+
+.bars-svg rect {
+  fill: color-mix(in srgb, var(--primary) 65%, transparent);
 }
 
 .threshold-line {
@@ -245,8 +239,8 @@ onBeforeUnmount(() => {
   bottom: 0;
   width: 2px;
   transform: translateX(-1px);
-  background: var(--error);
-  box-shadow: 0 0 4px var(--error);
+  background: #ba1a1a;
+  box-shadow: 0 0 4px #ba1a1a;
   pointer-events: none;
 }
 
@@ -263,7 +257,6 @@ onBeforeUnmount(() => {
 }
 
 :global(.stitch-dashboard.theme-dark) .threshold-line.ghost-line {
-  background: #a78bfa;
   box-shadow: 0 0 6px rgba(167, 139, 250, 0.5);
 }
 
