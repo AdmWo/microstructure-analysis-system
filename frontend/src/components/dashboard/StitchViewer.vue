@@ -16,16 +16,18 @@
           :style="{ filter: baseImageFilter }"
           @load="emit('image-load', $event)"
         />
-        <div v-if="invertRoi && displayedRoiBox && !isSwapped" class="roi-live-invert-layer" :style="roiInvertClipStyle">
-          <img :src="roiDataUrl" alt="" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%) invert(100%)` }" aria-hidden="true" />
+        <div v-if="displayedRoiBox && !isSwapped" class="roi-live-invert-layer" :style="roiInvertClipStyle">
+          <img :src="roiDataUrl" alt="" class="main-image" draggable="false" :style="{ filter: `contrast(${contrastPercent}%)${invertRoi ? ' invert(100%)' : ''}` }" aria-hidden="true" />
         </div>
         <div
           class="roi-overlay"
+          :class="overlayClass"
           @mousedown="emit('begin-roi', $event)"
         >
           <div
             v-if="displayedRoiBox"
             class="roi-box"
+            :class="roiBoxClass"
             :style="{ left: `${displayedRoiBox.left}px`, top: `${displayedRoiBox.top}px`, width: `${displayedRoiBox.width}px`, height: `${displayedRoiBox.height}px` }"
             @mousedown="handleRoiMouseDown"
           >
@@ -187,6 +189,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useWorkflowStore } from '../../stores/workflow'
+
+const workflow = useWorkflowStore()
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
@@ -203,6 +208,7 @@ const props = defineProps({
   drawing: { type: Object, required: true },
   isSwapped: { type: Boolean, default: false },
   maskDataUrl: { type: String, default: null },
+  spacePressed: { type: Boolean, default: false },
 
   // Scale calibration props
   scaleLineCoords: { type: Object, default: null },
@@ -242,8 +248,35 @@ const baseImageFilter = computed(() => {
   if (props.isSwapped && props.maskDataUrl && !props.displayedRoiBox) {
     return 'none'
   }
+  const shouldApplyWholeImageContrast = !props.displayedRoiBox
   const shouldInvertWholeImage = props.invertRoi && !props.displayedRoiBox
-  return `contrast(${props.contrastPercent}%)${shouldInvertWholeImage ? ' invert(100%)' : ''}`
+  if (shouldApplyWholeImageContrast) {
+    return `contrast(${props.contrastPercent}%)${shouldInvertWholeImage ? ' invert(100%)' : ''}`
+  }
+  return 'none'
+})
+
+const overlayClass = computed(() => {
+  if (workflow.interactionMode === 'scale') {
+    return 'cursor-pencil-cyan'
+  }
+  if (workflow.interactionMode === 'measure') {
+    return 'cursor-pencil-orange'
+  }
+  return 'cursor-crosshair'
+})
+
+const roiBoxClass = computed(() => {
+  if (workflow.interactionMode === 'scale') {
+    return 'cursor-pencil-cyan'
+  }
+  if (workflow.interactionMode === 'measure') {
+    return 'cursor-pencil-orange'
+  }
+  if (props.canEditRoi) {
+    return 'cursor-move'
+  }
+  return 'cursor-crosshair'
 })
 
 const roiInvertClipStyle = computed(() => {
@@ -439,7 +472,7 @@ const measureLineGeom = computed(() => {
 })
 
 function handleRoiMouseDown(e) {
-  if (props.canEditRoi) {
+  if (props.canEditRoi && e.button === 0 && !props.spacePressed) {
     e.stopPropagation()
     emit('begin-move-roi', e)
   }

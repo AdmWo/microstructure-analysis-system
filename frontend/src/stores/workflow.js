@@ -18,6 +18,12 @@ export const useWorkflowStore = defineStore('workflow', {
     scaleUnit: 'µm', // 'µm' or 'mm'
     scaleLineCoords: null, // { startX, startY, endX, endY } in natural image space
     measureLineCoords: null, // { startX, startY, endX, endY } in natural image space
+    avgD1CircularityPerimeter: null,
+    avgD2CircularityArea: null,
+    avgEdgeIndicator: null,
+    avgShapeFactorRaw: null,
+    avgRoundnessEllipse: null,
+    avgMalinowskaFactor: null,
   }),
   getters: {
     isFirstStage: (state) => state.currentStage === 1,
@@ -43,6 +49,12 @@ export const useWorkflowStore = defineStore('workflow', {
       this.scaleUnit = 'µm'
       this.scaleLineCoords = null
       this.measureLineCoords = null
+      this.avgD1CircularityPerimeter = null
+      this.avgD2CircularityArea = null
+      this.avgEdgeIndicator = null
+      this.avgShapeFactorRaw = null
+      this.avgRoundnessEllipse = null
+      this.avgMalinowskaFactor = null
     },
   },
 })

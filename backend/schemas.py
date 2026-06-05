@@ -15,6 +15,12 @@ class AnalysisResult(BaseModel):
     total_roi_area_physical: float | None = None
     average_pore_area_physical: float | None = None
     N_A: float | None = None
+    avg_d1_circularity_perimeter: float | None = None
+    avg_d2_circularity_area: float | None = None
+    avg_edge_indicator: float | None = None
+    avg_shape_factor_raw: float | None = None
+    avg_roundness_ellipse: float | None = None
+    avg_malinowska_factor: float | None = None
 
 
 class RoiSelection(BaseModel):

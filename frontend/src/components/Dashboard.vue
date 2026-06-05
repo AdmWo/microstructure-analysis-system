@@ -32,11 +32,14 @@
             <input type="number" min="1" :disabled="!params.roi" :value="params.roi?.width ?? 1" @change="updateManualRoiField({ field: 'width', value: Number($event.target.value || 1) })" />
             <input type="number" min="1" :disabled="!params.roi" :value="params.roi?.height ?? 1" @change="updateManualRoiField({ field: 'height', value: Number($event.target.value || 1) })" />
           </div>
-          <button type="button" class="mini-btn" @click="setRoiToFullImage">ROI = caly obraz</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 0.3rem;">
+            <button type="button" class="mini-btn" @click="setRoiToFullImage" style="margin-top: 0;">ROI = cały obraz</button>
+            <button type="button" class="mini-btn" @click="clearRoi" :disabled="!params.roi" style="margin-top: 0;">Wyczyść ROI</button>
+          </div>
         </label>
         <label class="toggle-row">
           <input type="checkbox" v-model="params.invert_roi" />
-          <span>Inwertuj ROI (wplywa na API)</span>
+          <span>Inwertuj ROI</span>
         </label>
       </template>
 
@@ -141,6 +144,7 @@
           :contrast-percent="params.contrast_percent"
           :invert-roi="params.invert_roi"
           :can-edit-roi="currentStage === 1 && workflow.interactionMode === 'roi'"
+          :space-pressed="view.spacePressed"
           :displayed-roi-box="displayedRoiBox"
           :drawing="drawing"
           :is-swapped="isSwapped"
@@ -174,6 +178,8 @@
           :ghost-threshold-percent="ghostThresholdPercent"
           :ghost-threshold-value="ghostThresholdValue"
           :histogram-note="histogramNote"
+          :min-intensity="histogramMinIntensity"
+          :max-intensity="histogramMaxIntensity"
           :metric-cards="metricCards"
           :aa-percent="aaPercent"
           :pore-count="poreCount"
@@ -186,9 +192,19 @@
           :total-roi-area-physical="result?.total_roi_area_physical"
           :average-pore-area-physical="result?.average_pore_area_physical"
           :pore-density-n-a="result?.N_A"
+          :avg-d1-circularity-perimeter="workflow.avgD1CircularityPerimeter"
+          :avg-d2-circularity-area="workflow.avgD2CircularityArea"
+          :avg-edge-indicator="workflow.avgEdgeIndicator"
+          :avg-shape-factor-raw="workflow.avgShapeFactorRaw"
+          :avg-roundness-ellipse="workflow.avgRoundnessEllipse"
+          :avg-malinowska-factor="workflow.avgMalinowskaFactor"
+          :is-thinner="histogramThinner"
+          :is-threshold-editable="isThresholdEditable"
           @toggle-swap="toggleSwap"
           @download-mask="downloadMask"
           @download-roi="downloadRoiCrop"
+          @update-threshold="onUpdateThreshold"
+          @toggle-thickness="toggleHistogramThickness"
         />
       </div>
 
@@ -196,8 +212,7 @@
         <div class="bottom-viewer-controls">
           <button type="button" class="bottom-btn" @click="zoomIn" title="Powiększ">+</button>
           <button type="button" class="bottom-btn" @click="zoomOut" title="Pomniejsz">-</button>
-          <button type="button" class="bottom-btn" @click="resetView">Dopasuj</button>
-          <button type="button" class="bottom-btn" @click="clearRoi" :disabled="!params.roi">Wyczyść ROI</button>
+          <button type="button" class="bottom-btn" @click="resetView">Oddal</button>
           
           <!-- Measurement tool button -->
           <button
@@ -280,7 +295,13 @@ const isSwapped = ref(false)
 const imageNatural = reactive({ width: 0, height: 0 })
 const imageRender = reactive({ width: 0, height: 0 })
 const imageStats = reactive({ mean: null, stdDev: null, snr: null })
-const histogramBins = ref(Array.from({ length: 24 }, () => 0))
+const histogramBins = ref([])
+const histogramThinner = ref(false)
+const isThresholdEditable = computed(() => {
+  return activePipelineStep.value === 4 && params.binarization_method === 'manual'
+})
+const histogramMinIntensity = ref(0)
+const histogramMaxIntensity = ref(255)
 const localOtsuThreshold = ref(null)
 const health = ref({ status: 'checking', message: 'Sprawdzanie polaczenia...' })
 const roiDraggingUi = ref(false)
@@ -358,9 +379,9 @@ const frameStyle = computed(() => ({
   ...viewTransform.value,
 }))
 const metricCards = computed(() => ([
-  { label: 'Jasnosc srednia', value: imageStats.mean !== null ? `${imageStats.mean.toFixed(2)} AU` : 'brak danych' },
-  { label: 'Odchylenie standardowe', value: imageStats.stdDev !== null ? `${imageStats.stdDev.toFixed(2)} AU` : 'brak danych' },
-  { label: 'Stosunek sygnal/szum', value: imageStats.snr !== null ? `${imageStats.snr.toFixed(2)} dB` : 'brak danych' },
+  { label: 'Jasnosc srednia', key: 'mean', value: imageStats.mean !== null ? `${imageStats.mean.toFixed(2)} AU` : 'brak danych' },
+  { label: 'Odchylenie standardowe', key: 'stdDev', value: imageStats.stdDev !== null ? `${imageStats.stdDev.toFixed(2)} AU` : 'brak danych' },
+  { label: 'Stosunek sygnal/szum', key: 'snr', value: imageStats.snr !== null ? `${imageStats.snr.toFixed(2)} dB` : 'brak danych' },
 ]))
 const activeThresholdValue = computed(() => {
   if (params.binarization_method === 'manual') {
@@ -372,7 +393,12 @@ const activeThresholdValue = computed(() => {
 
 const histogramThresholdPercent = computed(() => {
   const val = activeThresholdValue.value
-  return val !== null ? (val / 255) * 100 : null
+  if (val === null) return null
+  const min = histogramMinIntensity.value
+  const max = histogramMaxIntensity.value
+  if (max === min) return null
+  const pct = ((val - min) / (max - min)) * 100
+  return Math.max(0, Math.min(100, pct))
 })
 
 const ghostThresholdValue = computed(() => {
@@ -384,7 +410,12 @@ const ghostThresholdValue = computed(() => {
 
 const ghostThresholdPercent = computed(() => {
   const val = ghostThresholdValue.value
-  return val !== null ? (val / 255) * 100 : null
+  if (val === null) return null
+  const min = histogramMinIntensity.value
+  const max = histogramMaxIntensity.value
+  if (max === min) return null
+  const pct = ((val - min) / (max - min)) * 100
+  return Math.max(0, Math.min(100, pct))
 })
 
 const histogramNote = computed(() => {
@@ -1139,18 +1170,58 @@ function computeImageAnalytics() {
     }
 
     const pixels = ctx.getImageData(sx, sy, sw, sh).data
-    const bins = Array.from({ length: 24 }, () => 0)
     const hist256 = new Array(256).fill(0)
     let sum = 0
     let sumSq = 0
     let count = 0
+    let minLum = 255
+    let maxLum = 0
     for (let i = 0; i < pixels.length; i += 4) {
       const lum = Math.round(0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2])
-      bins[Math.min(23, Math.floor(lum / (256 / 24)))] += 1
       hist256[Math.min(255, Math.max(0, lum))]++
       sum += lum
       sumSq += lum * lum
       count += 1
+      if (lum < minLum) minLum = lum
+      if (lum > maxLum) maxLum = lum
+    }
+
+    if (count === 0 || minLum > maxLum) {
+      minLum = 0
+      maxLum = 255
+    }
+    if (minLum === maxLum) {
+      if (minLum > 0) minLum = Math.max(0, minLum - 1)
+      else maxLum = Math.min(255, maxLum + 1)
+    }
+
+    // Pad the range to at least 90% of the full scale (230 units) to limit zoom to max 10%
+    const minSpan = Math.round(255 * 0.9) // 230
+    let minIntensityVal = minLum
+    let maxIntensityVal = maxLum
+    const currentSpan = maxIntensityVal - minIntensityVal
+    if (currentSpan < minSpan) {
+      const mid = (minIntensityVal + maxIntensityVal) / 2
+      minIntensityVal = Math.max(0, Math.round(mid - minSpan / 2))
+      maxIntensityVal = minIntensityVal + minSpan
+      if (maxIntensityVal > 255) {
+        maxIntensityVal = 255
+        minIntensityVal = maxIntensityVal - minSpan
+      }
+    }
+
+    histogramMinIntensity.value = minIntensityVal
+    histogramMaxIntensity.value = maxIntensityVal
+
+    const binCount = histogramThinner.value ? 48 : 24
+    const bins = Array.from({ length: binCount }, () => 0)
+    const range = maxIntensityVal - minIntensityVal
+    for (let lum = minIntensityVal; lum <= maxIntensityVal; lum++) {
+      const pxCount = hist256[lum]
+      if (pxCount > 0) {
+        const binIdx = Math.min(binCount - 1, Math.floor(((lum - minIntensityVal) / (range + 1)) * binCount))
+        bins[binIdx] += pxCount
+      }
     }
     const mean = count ? sum / count : 0
     const variance = count ? Math.max(0, sumSq / count - mean * mean) : 0
@@ -1207,6 +1278,15 @@ function onKeyUp(e) {
   if (e.code === 'Space') view.spacePressed = false
 }
 
+function onUpdateThreshold(val) {
+  params.binarization_method = 'manual'
+  params.manual_threshold = val
+}
+
+function toggleHistogramThickness() {
+  histogramThinner.value = !histogramThinner.value
+}
+
 onMounted(() => {
   window.addEventListener('resize', updateImageRenderSize)
   window.addEventListener('keydown', onKeyDown)
@@ -1231,9 +1311,22 @@ watch(activePipelineStep, (newStep) => {
   if (newStep !== 6) {
     isSwapped.value = false
   }
+  if (newStep === 3) {
+    workflow.interactionMode = 'scale'
+  } else if (newStep === 2) {
+    workflow.interactionMode = 'roi'
+  } else {
+    if (workflow.interactionMode === 'scale') {
+      workflow.interactionMode = 'roi'
+    }
+  }
 })
 
 watch(roiDataUrl, () => {
+  computeImageAnalytics()
+})
+
+watch(histogramThinner, () => {
   computeImageAnalytics()
 })
 
@@ -1276,6 +1369,15 @@ async function runAnalysis() {
       scale_physical_value: workflow.scalePhysicalValue,
       scale_unit: workflow.scaleUnit,
     })
+    
+    // Save to Pinia store
+    workflow.avgD1CircularityPerimeter = result.value.avg_d1_circularity_perimeter
+    workflow.avgD2CircularityArea = result.value.avg_d2_circularity_area
+    workflow.avgEdgeIndicator = result.value.avg_edge_indicator
+    workflow.avgShapeFactorRaw = result.value.avg_shape_factor_raw
+    workflow.avgRoundnessEllipse = result.value.avg_roundness_ellipse
+    workflow.avgMalinowskaFactor = result.value.avg_malinowska_factor
+
     workflow.goToStage(5)
   } catch (e) {
     error.value = e.message || 'Analiza nie powiodła się.'
