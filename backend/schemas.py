@@ -11,6 +11,7 @@ class AnalysisResult(BaseModel):
     aa_percent: float
     vv_percent: float
     message: str = "Analysis complete"
+    used_threshold: int | None = None
 
 
 class RoiSelection(BaseModel):

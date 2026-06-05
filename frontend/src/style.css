@@ -1044,6 +1044,15 @@ select {
   cursor: not-allowed;
 }
 
+.swap-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--outline) !important;
+  color: var(--text-soft) !important;
+  background: var(--surface-2) !important;
+  box-shadow: none !important;
+}
+
 
 .vertical-step {
   display: flex;
@@ -1444,9 +1453,26 @@ select {
   bottom: 0;
   width: 2px;
   transform: translateX(-1px);
-  background: #ffb4ab;
-  box-shadow: 0 0 0 1px rgba(255, 180, 171, 0.25);
+  background: var(--error);
+  box-shadow: 0 0 4px var(--error);
   pointer-events: none;
+}
+
+.threshold-line.ghost-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+  background: #7c3aed;
+  box-shadow: 0 0 4px rgba(124, 58, 237, 0.3);
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.stitch-dashboard.theme-dark .threshold-line.ghost-line {
+  background: #a78bfa;
+  box-shadow: 0 0 6px rgba(167, 139, 250, 0.5);
 }
 
 .histogram-x-labels {

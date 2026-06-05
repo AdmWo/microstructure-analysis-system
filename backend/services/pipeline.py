@@ -42,14 +42,14 @@ def apply_denoise(gray: np.ndarray, params: AnalysisParams) -> np.ndarray:
     return cv2.medianBlur(gray, kernel)
 
 
-def binarize(gray: np.ndarray, params: AnalysisParams) -> np.ndarray:
+def binarize(gray: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, int]:
     """Segment pores as white in mask using Otsu or manual threshold."""
     if params.binarization_method == "manual":
         _, mask = cv2.threshold(gray, params.manual_threshold, 255, cv2.THRESH_BINARY_INV)
-        return mask
+        return mask, params.manual_threshold
 
-    _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    return mask
+    thresh_val, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    return mask, int(thresh_val)
 
 
 def morphological_cleanup(mask: np.ndarray, params: AnalysisParams) -> np.ndarray:
@@ -79,7 +79,7 @@ def encode_image_b64(img: np.ndarray, fmt: str = ".png") -> str:
     return base64.b64encode(buf.tobytes()).decode("utf-8")
 
 
-def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, np.ndarray, int, float, float]:
+def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, np.ndarray, int, float, float, int]:
     """Execute the staged scientific workflow and return ROI/mask/stats."""
     roi_img = crop_roi(img, params.roi)
     if params.invert_roi:
@@ -89,9 +89,10 @@ def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, n
     preprocessed = apply_denoise(gray, params)
 
     if params.stage >= 2:
-        segmented = binarize(preprocessed, params)
+        segmented, thresh_val = binarize(preprocessed, params)
     else:
         segmented = np.zeros_like(preprocessed, dtype=np.uint8)
+        thresh_val = params.manual_threshold
 
     if params.stage >= 3:
         cleaned_mask = morphological_cleanup(segmented, params)
@@ -99,4 +100,4 @@ def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, n
         cleaned_mask = segmented
 
     pore_count, aa_percent, vv_percent = stereology_stats(cleaned_mask)
-    return roi_img, cleaned_mask, pore_count, aa_percent, vv_percent
+    return roi_img, cleaned_mask, pore_count, aa_percent, vv_percent, thresh_val

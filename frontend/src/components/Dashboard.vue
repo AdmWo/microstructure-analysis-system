@@ -122,7 +122,9 @@
         <DashboardMetrics
           :histogram-bins="histogramBins"
           :threshold-percent="histogramThresholdPercent"
-          :threshold-value="params.manual_threshold"
+          :threshold-value="activeThresholdValue"
+          :ghost-threshold-percent="ghostThresholdPercent"
+          :ghost-threshold-value="ghostThresholdValue"
           :histogram-note="histogramNote"
           :metric-cards="metricCards"
           :aa-percent="aaPercent"
@@ -130,6 +132,7 @@
           :mask-data-url="maskDataUrl"
           :is-swapped="isSwapped"
           :roi-crop-data-url="roiCropDataUrl"
+          :can-swap="activePipelineStep === 5"
           @toggle-swap="toggleSwap"
           @download-mask="downloadMask"
           @download-roi="downloadRoiCrop"
@@ -142,7 +145,7 @@
           <button type="button" class="bottom-btn" @click="zoomOut" title="Pomniejsz">-</button>
           <button type="button" class="bottom-btn" @click="resetView">Dopasuj</button>
           <button type="button" class="bottom-btn" @click="clearRoi" :disabled="!params.roi">Wyczyść ROI</button>
-          <button v-if="maskDataUrl" type="button" class="bottom-btn" @click="toggleSwap" :class="{ 'btn-active': isSwapped }">
+          <button v-if="maskDataUrl && activePipelineStep === 5" type="button" class="bottom-btn" @click="toggleSwap" :class="{ 'btn-active': isSwapped }">
             {{ isSwapped ? 'Pokaż oryginał' : 'Pokaż maskę' }}
           </button>
         </div>
@@ -199,6 +202,7 @@ const imageNatural = reactive({ width: 0, height: 0 })
 const imageRender = reactive({ width: 0, height: 0 })
 const imageStats = reactive({ mean: null, stdDev: null, snr: null })
 const histogramBins = ref(Array.from({ length: 24 }, () => 0))
+const localOtsuThreshold = ref(null)
 const health = ref({ status: 'checking', message: 'Sprawdzanie polaczenia...' })
 const roiDraggingUi = ref(false)
 const helpOpen = ref(false)
@@ -271,12 +275,45 @@ const metricCards = computed(() => ([
   { label: 'Odchylenie standardowe', value: imageStats.stdDev !== null ? `${imageStats.stdDev.toFixed(2)} AU` : 'brak danych' },
   { label: 'Stosunek sygnal/szum', value: imageStats.snr !== null ? `${imageStats.snr.toFixed(2)} dB` : 'brak danych' },
 ]))
-const histogramThresholdPercent = computed(() => (params.binarization_method === 'manual' ? (params.manual_threshold / 255) * 100 : null))
+const activeThresholdValue = computed(() => {
+  if (params.binarization_method === 'manual') {
+    return params.manual_threshold
+  } else {
+    return result.value?.used_threshold ?? null
+  }
+})
+
+const histogramThresholdPercent = computed(() => {
+  const val = activeThresholdValue.value
+  return val !== null ? (val / 255) * 100 : null
+})
+
+const ghostThresholdValue = computed(() => {
+  if (!result.value || result.value.used_threshold === undefined || result.value.used_threshold === null) return null
+  const lastUsed = result.value.used_threshold
+  if (lastUsed === activeThresholdValue.value) return null
+  return lastUsed
+})
+
+const ghostThresholdPercent = computed(() => {
+  const val = ghostThresholdValue.value
+  return val !== null ? (val / 255) * 100 : null
+})
+
 const histogramNote = computed(() => {
   if (!roiDataUrl.value) return 'Wgraj obraz, aby zobaczyc histogram ROI.'
-  return params.binarization_method === 'manual'
-    ? `Histogram liczony z aktualnego ROI. Marker pokazuje prog reczny = ${params.manual_threshold}.`
-    : 'Histogram liczony z aktualnego ROI. Prog Otsu jest wyliczany automatycznie przez API.'
+  let note = 'Histogram liczony z aktualnego ROI. '
+  if (params.binarization_method === 'manual') {
+    note += `Linia pokazuje próg ręczny = ${params.manual_threshold}.`
+  } else if (activeThresholdValue.value !== null) {
+    note += `Linia pokazuje automatyczny próg Otsu = ${activeThresholdValue.value}.`
+  } else {
+    note += 'Próg Otsu zostanie wyznaczony po uruchomieniu analizy.'
+  }
+  if (ghostThresholdValue.value !== null) {
+    note += ` Linia przerywana ("duch") to próg z ostatniej analizy = ${ghostThresholdValue.value}.`
+  }
+  return note
 })
 const roiCropDataUrl = computed(() => result.value?.roi_b64 ? `data:image/png;base64,${result.value.roi_b64}` : null)
 
@@ -771,6 +808,7 @@ function computeImageAnalytics() {
     imageStats.mean = null
     imageStats.stdDev = null
     imageStats.snr = null
+    localOtsuThreshold.value = null
     return
   }
   const image = new Image()
@@ -800,12 +838,14 @@ function computeImageAnalytics() {
 
     const pixels = ctx.getImageData(sx, sy, sw, sh).data
     const bins = Array.from({ length: 24 }, () => 0)
+    const hist256 = new Array(256).fill(0)
     let sum = 0
     let sumSq = 0
     let count = 0
     for (let i = 0; i < pixels.length; i += 4) {
-      const lum = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
+      const lum = Math.round(0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2])
       bins[Math.min(23, Math.floor(lum / (256 / 24)))] += 1
+      hist256[Math.min(255, Math.max(0, lum))]++
       sum += lum
       sumSq += lum * lum
       count += 1
@@ -819,6 +859,34 @@ function computeImageAnalytics() {
     imageStats.mean = mean
     imageStats.stdDev = stdDev
     imageStats.snr = Number.isFinite(snr) ? snr : null
+
+    // Compute Otsu threshold on the client side
+    let totalSum = 0
+    for (let i = 0; i < 256; i++) {
+      totalSum += i * hist256[i]
+    }
+
+    let sumB = 0
+    let wB = 0
+    let wF = 0
+    let varMax = 0
+    let threshold = 0
+
+    for (let t = 0; t < 256; t++) {
+      wB += hist256[t]
+      if (wB === 0) continue
+      wF = count - wB
+      if (wF === 0) break
+      sumB += t * hist256[t]
+      const mB = sumB / wB
+      const mF = (totalSum - sumB) / wF
+      const varBetween = wB * wF * (mB - mF) * (mB - mF)
+      if (varBetween > varMax) {
+        varMax = varBetween
+        threshold = t
+      }
+    }
+    localOtsuThreshold.value = threshold
   }
   image.src = roiDataUrl.value
 }
@@ -855,6 +923,12 @@ onBeforeUnmount(() => {
 
 watch(theme, (value) => {
   localStorage.setItem('mas-stitch-theme', value)
+})
+
+watch(activePipelineStep, (newStep) => {
+  if (newStep !== 5) {
+    isSwapped.value = false
+  }
 })
 
 watch(roiDataUrl, () => {

@@ -7,6 +7,12 @@
           <span v-for="(h, idx) in histogramBins" :key="idx" :style="{ height: `${h}%` }" />
         </div>
         <div
+          v-if="ghostThresholdPercent !== null"
+          class="threshold-line ghost-line"
+          :style="{ left: `${ghostThresholdPercent}%` }"
+          :title="`Ostatni próg: ${ghostThresholdValue}`"
+        />
+        <div
           v-if="thresholdPercent !== null"
           class="threshold-line"
           :style="{ left: `${thresholdPercent}%` }"
@@ -51,6 +57,7 @@
           type="button"
           class="swap-btn"
           @click="emit('toggle-swap')"
+          :disabled="!canSwap"
           style="background: var(--surface-3); border: 1px solid var(--outline); color: var(--text); font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
           :style="isSwapped ? 'border-color: var(--primary); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent);' : ''"
         >
@@ -82,6 +89,8 @@ defineProps({
   histogramBins: { type: Array, required: true },
   thresholdPercent: { type: Number, default: null },
   thresholdValue: { type: Number, default: null },
+  ghostThresholdPercent: { type: Number, default: null },
+  ghostThresholdValue: { type: Number, default: null },
   histogramNote: { type: String, default: '' },
   metricCards: { type: Array, required: true },
   aaPercent: { type: Number, default: null },
@@ -89,5 +98,6 @@ defineProps({
   maskDataUrl: { type: String, default: null },
   isSwapped: { type: Boolean, default: false },
   roiCropDataUrl: { type: String, default: null },
+  canSwap: { type: Boolean, default: true },
 })
 </script>

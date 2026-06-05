@@ -62,7 +62,7 @@ async def analyze(file: UploadFile = File(...), params: str | None = Form(defaul
     except (json.JSONDecodeError, ValidationError) as e:
         raise HTTPException(422, f"Invalid params payload: {e}")
 
-    roi_img, cleaned_mask, pore_count, aa_percent, vv_percent = run_workflow(img, analysis_params)
+    roi_img, cleaned_mask, pore_count, aa_percent, vv_percent, thresh_val = run_workflow(img, analysis_params)
 
     try:
         original_b64 = encode_image_b64(img)
@@ -79,4 +79,5 @@ async def analyze(file: UploadFile = File(...), params: str | None = Form(defaul
         pore_count=pore_count,
         aa_percent=aa_percent,
         vv_percent=vv_percent,
+        used_threshold=thresh_val,
     )
