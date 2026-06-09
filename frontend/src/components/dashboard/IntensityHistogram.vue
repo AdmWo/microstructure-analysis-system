@@ -9,7 +9,7 @@
         style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; transition: color 0.2s;"
         :title="isThinner ? 'Zmień słupki na grubsze' : 'Zmień słupki na cieńsze'"
       >
-        <svg v-if="!isThinner" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+        <svg v-if="isThinner" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
           <rect x="2" y="4" width="5" height="16" rx="1" />
           <rect x="9" y="4" width="5" height="16" rx="1" />
           <rect x="16" y="4" width="5" height="16" rx="1" />

@@ -16,26 +16,48 @@
     />
 
     <section class="metric-card">
-      <h4>Wyniki analizy</h4>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--outline); padding-bottom: 8px;">
+        <h4 style="margin: 0; font: 700 12px/1 'Space Grotesk', sans-serif;">Wyniki analizy</h4>
+        <div v-if="imagesCount > 1" class="metric-toggle-group" style="display: flex; gap: 4px;">
+          <button
+            type="button"
+            class="toggle-btn"
+            :class="{ active: showAverages }"
+            @click="emit('toggle-display-mode', true)"
+            style="font-size: 9px; padding: 3px 6px; cursor: pointer; border-radius: 4px; border: 1px solid var(--outline); background: var(--surface-3); color: var(--text);"
+          >
+            Średnie
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            :class="{ active: !showAverages }"
+            @click="emit('toggle-display-mode', false)"
+            style="font-size: 9px; padding: 3px 6px; cursor: pointer; border-radius: 4px; border: 1px solid var(--outline); background: var(--surface-3); color: var(--text);"
+          >
+            Bieżący
+          </button>
+        </div>
+      </div>
       
       <!-- Grupa 1: Globalne szacunki -->
       <div class="metric-group">
         <h5 class="metric-group-title">Globalne szacunki</h5>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'aa')" @mouseleave="hideTooltip">Ułamek pow. (A_A)</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'aa')">Ułamek pow. (A_A)</span>
           <strong>{{ aaPercent !== null ? `${aaPercent.toFixed(2)}%` : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'count')" @mouseleave="hideTooltip">Liczba porów</span>
-          <strong>{{ poreCount !== null ? poreCount : 'brak danych' }}</strong>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'count')">Liczba porów</span>
+          <strong>{{ poreCount !== null ? (Number.isInteger(poreCount) ? poreCount : poreCount.toFixed(1)) : 'brak danych' }}</strong>
         </div>
         <template v-if="scaleEnabled && totalRoiAreaPhysical !== null">
           <div class="metric-row">
-            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roi')" @mouseleave="hideTooltip">Obszar ROI</span>
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roi')">Obszar ROI</span>
             <strong>{{ `${totalRoiAreaPhysical.toFixed(2)} ${scaleUnit}²` }}</strong>
           </div>
           <div class="metric-row">
-            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'density')" @mouseleave="hideTooltip">Gęstość p. (N_A)</span>
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'density')">Gęstość p. (N_A)</span>
             <strong>
               {{ poreDensityNA !== null ? poreDensityNA.toFixed(2) : '0.00' }}
               <small style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
@@ -45,41 +67,41 @@
           </div>
         </template>
       </div>
-
+ 
       <!-- Grupa 2: Rozkład wielkości porów -->
       <div v-if="scaleEnabled" class="metric-group">
         <h5 class="metric-group-title">Rozkład wielkości porów</h5>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'poreArea')" @mouseleave="hideTooltip">Śr. obszar poru</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'poreArea')">Śr. obszar poru</span>
           <strong>{{ averagePoreAreaPhysical !== null ? `${averagePoreAreaPhysical.toFixed(2)} ${scaleUnit}²` : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd1')" @mouseleave="hideTooltip">Średnica d_1 (obwód)</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd1')">Średnica d_1 (obwód)</span>
           <strong>{{ avgD1CircularityPerimeter !== null ? `${avgD1CircularityPerimeter.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd2')" @mouseleave="hideTooltip">Średnica d_2 (pole)</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd2')">Średnica d_2 (pole)</span>
           <strong>{{ avgD2CircularityArea !== null ? `${avgD2CircularityArea.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
         </div>
       </div>
-
+ 
       <!-- Grupa 3: Wskaźniki kształtu porów -->
       <div class="metric-group">
         <h5 class="metric-group-title">Wskaźniki kształtu porów</h5>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'edge')" @mouseleave="hideTooltip">Współczynnik brzegu</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'edge')">Współczynnik brzegu</span>
           <strong>{{ avgEdgeIndicator !== null ? avgEdgeIndicator.toFixed(3) : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roundness')" @mouseleave="hideTooltip">Okrągłość elipsy</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roundness')">Okrągłość elipsy</span>
           <strong>{{ avgRoundnessEllipse !== null ? avgRoundnessEllipse.toFixed(3) : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'malinowska')" @mouseleave="hideTooltip">Współczynnik Malinowskiej</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'malinowska')">Współczynnik Malinowskiej</span>
           <strong>{{ avgMalinowskaFactor !== null ? avgMalinowskaFactor.toFixed(3) : 'brak danych' }}</strong>
         </div>
         <div v-if="scaleEnabled" class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'shape')" @mouseleave="hideTooltip">Wskaźnik kształtu</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'shape')">Wskaźnik kształtu</span>
           <strong>
             {{ avgShapeFactorRaw !== null ? avgShapeFactorRaw.toFixed(4) : 'brak danych' }}
             <small v-if="avgShapeFactorRaw !== null" style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
@@ -89,14 +111,14 @@
         </div>
       </div>
     </section>
-
+ 
     <section class="metric-card">
       <div v-for="metric in metricCards" :key="metric.label" class="metric-row">
-        <span class="tooltip-trigger" @mouseenter="showTooltip($event, metric.key)" @mouseleave="hideTooltip">{{ metric.label }}</span>
+        <span class="tooltip-trigger" @mouseenter="showTooltip($event, metric.key)">{{ metric.label }}</span>
         <strong>{{ metric.value }}</strong>
       </div>
     </section>
-
+ 
     <section v-if="maskDataUrl" class="metric-card" style="margin-top: auto;">
       <div class="metric-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <h4 style="margin: 0; font: 700 10px/1 'Space Grotesk', sans-serif;">
@@ -134,7 +156,7 @@
       </div>
     </section>
   </aside>
-
+ 
   <!-- Custom Tooltip Popup -->
   <MetricTooltip
     :visible="tooltip.visible"
@@ -147,14 +169,14 @@
     @mouseleave="onTooltipMouseLeave"
   />
 </template>
-
+ 
 <script setup>
 import { ref, reactive } from 'vue'
 import MetricTooltip from './MetricTooltip.vue'
 import IntensityHistogram from './IntensityHistogram.vue'
-
-const emit = defineEmits(['toggle-swap', 'download-mask', 'download-roi', 'update-threshold', 'toggle-thickness'])
-
+ 
+const emit = defineEmits(['toggle-swap', 'download-mask', 'download-roi', 'update-threshold', 'toggle-thickness', 'toggle-display-mode'])
+ 
 defineProps({
   histogramBins: { type: Array, required: true },
   thresholdPercent: { type: Number, default: null },
@@ -173,14 +195,14 @@ defineProps({
   isSwapped: { type: Boolean, default: false },
   roiCropDataUrl: { type: String, default: null },
   canSwap: { type: Boolean, default: true },
-
+ 
   // Scale calibration props
   scaleEnabled: { type: Boolean, default: false },
   scaleUnit: { type: String, default: 'µm' },
   totalRoiAreaPhysical: { type: Number, default: null },
   averagePoreAreaPhysical: { type: Number, default: null },
   poreDensityNA: { type: Number, default: null },
-
+ 
   // Shape factors
   avgD1CircularityPerimeter: { type: Number, default: null },
   avgD2CircularityArea: { type: Number, default: null },
@@ -188,6 +210,10 @@ defineProps({
   avgShapeFactorRaw: { type: Number, default: null },
   avgRoundnessEllipse: { type: Number, default: null },
   avgMalinowskaFactor: { type: Number, default: null },
+
+  // Multiple images props
+  imagesCount: { type: Number, default: 1 },
+  showAverages: { type: Boolean, default: true },
 })
 
 const panelRef = ref(null)
@@ -310,3 +336,130 @@ function onTooltipMouseLeave() {
   tooltip.visible = false
 }
 </script>
+
+<style scoped>
+.metrics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 6px;
+  padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface);
+}
+
+.metrics-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.metrics-panel::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+.metrics-panel::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 3px;
+}
+.metrics-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.metric-card {
+  border: 1px solid var(--outline);
+  background: var(--surface-2);
+  padding: 10px;
+}
+
+.metric-card h4 {
+  color: var(--text-muted);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  font: 700 10px/1 'Space Grotesk', sans-serif;
+}
+
+.metric-group {
+  margin-top: 10px;
+  border-top: 1px solid var(--outline);
+  padding-top: 10px;
+}
+
+.metric-group:first-of-type {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.metric-group-title {
+  margin: 0 0 8px;
+  color: var(--primary);
+  text-transform: uppercase;
+  font: 700 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: 500 12px/1.4 'Space Grotesk', sans-serif;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+
+.metric-row strong {
+  color: var(--text);
+}
+
+.tooltip-trigger {
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+  transition: color 0.15s ease, border-bottom-color 0.15s ease;
+}
+
+.tooltip-trigger:hover {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.metric-row span[title] {
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+}
+
+.mask-image {
+  width: 100%;
+  border: 1px solid var(--outline);
+  background: #0e0e0f;
+}
+
+.retry-health {
+  margin-left: auto;
+  border: 1px solid var(--outline);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font: 600 10px/1 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .metrics-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metrics-panel .status {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .metrics-panel {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
