@@ -2027,6 +2027,7 @@ select {
   gap: 16px;
   overflow-y: auto;
   padding-bottom: 20px;
+  padding-top: 10px;
 }
 
 @media (max-width: 1200px) {

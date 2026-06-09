@@ -18,9 +18,6 @@
     <div v-if="currentStage === 1 && images && images.length > 0" class="viewer-grid-mode">
       <div class="grid-header">
         <h3>Lista obrazów do analizy ({{ images.length }})</h3>
-        <button type="button" class="btn primary add-btn-top" @click="emit('open-file-picker')">
-          Dodaj obrazy
-        </button>
       </div>
       <div class="images-gallery-grid">
         <div
@@ -35,7 +32,7 @@
             <div
               v-if="img.params?.roi && img.imageNatural?.width && img.imageNatural?.height"
               class="gallery-roi-outline"
-              :style="getRoiOutlineStyle(img)"
+              :style="getRoiOutlineStyle(img, 1.6)"
             ></div>
             <button type="button" class="gallery-card-delete-btn" @click.stop="emit('delete-image', index)" title="Usuń obraz">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -59,7 +56,7 @@
 
     <!-- Empty Drop-zone Overlay -->
     <div v-else-if="!roiDataUrl" class="viewer-overlay">
-      <p>{{ isDragging ? 'Upusc obrazy, aby rozpoczac analize' : 'Wgraj obrazy mikroskopowe, aby zaczac' }}</p>
+      <p>{{ isDragging ? 'Upusc obrazy, aby rozpoczac analize' : 'Wgraj zdjęcia mikroskopowe, aby zaczac' }}</p>
       <button type="button" @click="emit('open-file-picker')">Wybierz obrazy</button>
       <p v-if="error" class="error-text">{{ error }}</p>
     </div>
@@ -259,7 +256,7 @@
             <div
               v-if="img.params?.roi && img.imageNatural?.width && img.imageNatural?.height"
               class="thumbnail-roi-outline"
-              :style="getRoiOutlineStyle(img)"
+              :style="getRoiOutlineStyle(img, 76 / 55)"
             ></div>
           </div>
           <span class="thumbnail-name" :title="img.name">{{ img.name }}</span>
@@ -572,16 +569,39 @@ function handleRoiMouseDown(e) {
   }
 }
 
-function getRoiOutlineStyle(img) {
+function getRoiOutlineStyle(img, containerAspect = 1.6) {
   if (!img.params || !img.params.roi || !img.imageNatural?.width || !img.imageNatural?.height) return {}
   const { x, y, width, height } = img.params.roi
   const w = img.imageNatural.width
   const h = img.imageNatural.height
+  const imgRatio = w / h
+
+  // Initial percentages relative to the image
+  const pLeft = x / w
+  const pTop = y / h
+  const pWidth = width / w
+  const pHeight = height / h
+
+  let scaleX = 1
+  let scaleY = 1
+  let offsetX = 0
+  let offsetY = 0
+
+  if (imgRatio > containerAspect) {
+    // Image is wider than container aspect ratio (touches left/right, letterbox top/bottom)
+    scaleY = containerAspect / imgRatio
+    offsetY = (1 - scaleY) / 2
+  } else {
+    // Image is taller than or equal to container aspect ratio (touches top/bottom, pillarbox left/right)
+    scaleX = imgRatio / containerAspect
+    offsetX = (1 - scaleX) / 2
+  }
+
   return {
-    left: `${(x / w) * 100}%`,
-    top: `${(y / h) * 100}%`,
-    width: `${(width / w) * 100}%`,
-    height: `${(height / h) * 100}%`,
+    left: `${(offsetX + pLeft * scaleX) * 100}%`,
+    top: `${(offsetY + pTop * scaleY) * 100}%`,
+    width: `${(pWidth * scaleX) * 100}%`,
+    height: `${(pHeight * scaleY) * 100}%`,
   }
 }
 </script>
@@ -603,12 +623,11 @@ function getRoiOutlineStyle(img) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #09090b;
+  background: var(--surface-2);
 }
 
 .grid-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
@@ -616,12 +635,7 @@ function getRoiOutlineStyle(img) {
 .grid-header h3 {
   margin: 0;
   font: 700 16px 'Space Grotesk', sans-serif;
-  color: #fff;
-}
-
-.add-btn-top {
-  font-size: 11px;
-  padding: 6px 14px;
+  color: var(--text);
 }
 
 .images-gallery-grid {
@@ -632,6 +646,25 @@ function getRoiOutlineStyle(img) {
   gap: 16px;
   overflow-y: auto;
   padding-bottom: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface-2);
+}
+
+.images-gallery-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.images-gallery-grid::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+
+.images-gallery-grid::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 99px;
+}
+
+.images-gallery-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }
 
 @media (max-width: 1200px) {
@@ -648,8 +681,8 @@ function getRoiOutlineStyle(img) {
 
 .gallery-card {
   position: relative;
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: var(--surface);
+  border: 1px solid var(--outline);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
@@ -666,11 +699,11 @@ function getRoiOutlineStyle(img) {
 .gallery-card.active {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
-  background: color-mix(in srgb, var(--primary) 5%, #18181b);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
 }
 
 .gallery-card.add-card {
-  border: 1px dashed #3c494e;
+  border: 1px dashed var(--outline);
   background: transparent;
   display: flex;
   flex-direction: column;
@@ -708,7 +741,7 @@ function getRoiOutlineStyle(img) {
   position: relative;
   width: 100%;
   aspect-ratio: 16/10;
-  background: #09090b;
+  background: var(--surface-3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -764,7 +797,7 @@ function getRoiOutlineStyle(img) {
 
 .gallery-card-name {
   font-size: 11px;
-  color: #f4f4f5;
+  color: var(--text);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -773,7 +806,7 @@ function getRoiOutlineStyle(img) {
 
 .gallery-card-status {
   font-size: 9px;
-  color: #71717a;
+  color: var(--text-soft);
   text-transform: uppercase;
   font-weight: bold;
   letter-spacing: 0.05em;

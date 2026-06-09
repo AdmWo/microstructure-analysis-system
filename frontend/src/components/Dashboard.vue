@@ -14,7 +14,7 @@
     >
       <!-- Step 1: Obraz (List & upload of multiple images) -->
       <template v-if="currentStage === 1">
-        <button type="button" class="mini-btn" @click="openFilePicker">Dodaj obrazy</button>
+        <button type="button" class="mini-btn" @click="openFilePicker">Dodaj zdjęcia</button>
         <div class="sidebar-image-list">
           <div
             v-for="(img, idx) in images"
@@ -580,7 +580,7 @@ const currentStageDesc = computed(() => {
 
 function goToPipelineStep(step) {
   if (images.value.length === 0) {
-    error.value = 'Najpierw wgraj obrazy, aby przejsc dalej w workflow.'
+    error.value = 'Najpierw wgraj zdjęcia, aby przejsc dalej w workflow.'
     return
   }
   workflow.goToStage(step)
@@ -1647,7 +1647,7 @@ watch(() => view.zoom, () => {
 // Run concurrent analysis for all uploaded images
 async function runAnalysis() {
   if (images.value.length === 0) {
-    error.value = 'Najpierw wgraj obrazy.'
+    error.value = 'Najpierw wgraj zdjęcia.'
     return
   }
   error.value = null
