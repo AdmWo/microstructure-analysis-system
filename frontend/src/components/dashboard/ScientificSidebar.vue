@@ -32,8 +32,61 @@
 
     <!-- Stage Info Description Section -->
     <div class="sidebar-stage-info">
-      <h4 class="stage-info-title">{{ stageTitle }}</h4>
-      <p class="stage-info-description">{{ stageDescription }}</p>
+      <!-- Toggle Button (only when in stages 2-6 and we have images) -->
+      <button
+        v-if="images && images.length > 0 && currentStage > 1"
+        type="button"
+        class="stage-info-toggle-btn"
+        @click="showImagesMode = !showImagesMode"
+        :title="showImagesMode ? 'Pokaż opis etapu' : 'Pokaż listę zdjęć'"
+      >
+        <!-- Info Icon (shows when in Images mode) -->
+        <svg v-if="showImagesMode" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <!-- Images Icon (shows when in Info mode) -->
+        <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2z"></path>
+          <path d="M4 14V6a2 2 0 0 1 2-2h12"></path>
+        </svg>
+      </button>
+
+      <!-- Mode A: Description -->
+      <div v-if="!showImagesMode">
+        <h4 class="stage-info-title">{{ stageTitle }}</h4>
+        <p class="stage-info-description">{{ stageDescription }}</p>
+      </div>
+
+      <!-- Mode B: Images List -->
+      <div v-else class="sidebar-images-mode">
+        <h5 class="sidebar-mode-title">Zdjęcia ({{ images.length }})</h5>
+        <div class="sidebar-thumbnails-container">
+          <div
+            v-for="(img, index) in images"
+            :key="img.id"
+            class="sidebar-thumb-card"
+            :class="{ active: index === activeImageIndex }"
+            @click="emit('select-image', index)"
+          >
+            <div class="sidebar-thumb-preview">
+              <img :src="img.localPreview" class="sidebar-thumb-img" />
+              <div
+                v-if="img.params?.roi && img.imageNatural?.width && img.imageNatural?.height"
+                class="sidebar-thumb-roi"
+                :style="getRoiOutlineStyle(img, 70 / 46)"
+              ></div>
+            </div>
+            <span class="sidebar-thumb-name" :title="img.name">{{ img.name }}</span>
+            <button type="button" class="sidebar-thumb-del" @click.stop="emit('delete-image', index)" title="Usuń obraz">×</button>
+          </div>
+          <div class="sidebar-thumb-card add-card" @click="emit('open-file-picker')">
+            <span class="add-icon">+</span>
+            <span class="add-text">Dodaj</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="control-panel">
@@ -43,15 +96,61 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref, watch } from 'vue'
+
+const props = defineProps({
   currentStage: { type: Number, required: true },
   steps: { type: Array, required: true },
   activeStep: { type: Number, required: true },
   stageTitle: { type: String, required: true },
   stageDescription: { type: String, required: true },
+  images: { type: Array, default: () => [] },
+  activeImageIndex: { type: Number, default: 0 },
 })
 
-const emit = defineEmits(['step', 'prev', 'next'])
+const emit = defineEmits(['step', 'prev', 'next', 'select-image', 'delete-image', 'open-file-picker'])
+
+const showImagesMode = ref(false)
+
+watch(() => props.currentStage, (newStage) => {
+  if (newStage === 1) {
+    showImagesMode.value = false
+  }
+})
+
+function getRoiOutlineStyle(img, containerAspect = 1.6) {
+  if (!img.params || !img.params.roi || !img.imageNatural?.width || !img.imageNatural?.height) return {}
+  const { x, y, width, height } = img.params.roi
+  const w = img.imageNatural.width
+  const h = img.imageNatural.height
+  const imgRatio = w / h
+
+  // Initial percentages relative to the image
+  const pLeft = x / w
+  const pTop = y / h
+  const pWidth = width / w
+  const pHeight = height / h
+
+  let scaleX = 1
+  let scaleY = 1
+  let offsetX = 0
+  let offsetY = 0
+
+  if (imgRatio > containerAspect) {
+    scaleY = containerAspect / imgRatio
+    offsetY = (1 - scaleY) / 2
+  } else {
+    scaleX = imgRatio / containerAspect
+    offsetX = (1 - scaleX) / 2
+  }
+
+  return {
+    left: `${(offsetX + pLeft * scaleX) * 100}%`,
+    top: `${(offsetY + pTop * scaleY) * 100}%`,
+    width: `${(pWidth * scaleX) * 100}%`,
+    height: `${(pHeight * scaleY) * 100}%`,
+  }
+}
 </script>
 
 <style scoped>
@@ -268,16 +367,15 @@ const emit = defineEmits(['step', 'prev', 'next'])
 }
 
 .sidebar-stage-info {
-  height: 160px;
+  flex: 1;
   min-height: 160px;
-  max-height: 160px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--outline);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   background: var(--surface-2);
+  position: relative;
 }
 
 .stage-info-title {
@@ -286,17 +384,217 @@ const emit = defineEmits(['step', 'prev', 'next'])
   font: 700 15px/1.3 'Space Grotesk', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  padding-right: 28px;
 }
 
 .stage-info-description {
-  margin: 0;
+  margin: 8px 0 0 0;
   color: var(--text-soft);
   font-size: 13.5px;
   line-height: 1.6;
 }
 
+.stage-info-toggle-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.stage-info-toggle-btn:hover {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.sidebar-images-mode {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sidebar-mode-title {
+  margin: 0 0 8px 0;
+  color: var(--primary);
+  font: 700 11px/1.3 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-right: 28px;
+}
+
+.sidebar-thumbnails-container {
+  display: grid;
+  grid-template-rows: repeat(2, 72px);
+  grid-auto-flow: column;
+  grid-auto-columns: 80px;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  height: 168px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface-2);
+  box-sizing: border-box;
+}
+
+.sidebar-thumbnails-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sidebar-thumbnails-container::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+
+.sidebar-thumbnails-container::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 99px;
+}
+
+.sidebar-thumbnails-container::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.sidebar-thumb-card {
+  position: relative;
+  width: 80px;
+  height: 72px;
+  min-width: 80px;
+  background: var(--surface-3);
+  border: 1px solid var(--outline);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.sidebar-thumb-card:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface-3));
+}
+
+.sidebar-thumb-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface-3));
+}
+
+.sidebar-thumb-preview {
+  position: relative;
+  width: 100%;
+  height: 46px;
+  background: #000;
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-thumb-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.sidebar-thumb-roi {
+  position: absolute;
+  border: 1px solid #ef4444;
+  background-color: rgba(239, 68, 68, 0.2);
+  box-sizing: border-box;
+}
+
+.sidebar-thumb-name {
+  font-size: 8px;
+  color: var(--text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.sidebar-thumb-del {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  border: 1px solid var(--surface-2);
+  font-size: 9px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+.sidebar-thumb-del:hover {
+  transform: scale(1.15);
+  background: #ff4d4d;
+}
+
+.sidebar-thumb-card:hover .sidebar-thumb-del {
+  opacity: 1;
+}
+
+.sidebar-thumb-card.add-card {
+  border: 1px dashed var(--outline);
+  background: transparent;
+  justify-content: center;
+  gap: 2px;
+}
+
+.sidebar-thumb-card.add-card:hover {
+  border-style: solid;
+  border-color: var(--primary);
+}
+
+.sidebar-thumb-card.add-card .add-icon {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-soft);
+  line-height: 1;
+}
+
+.sidebar-thumb-card.add-card .add-text {
+  font-size: 8px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.sidebar-thumb-card.add-card:hover .add-icon,
+.sidebar-thumb-card.add-card:hover .add-text {
+  color: var(--primary);
+}
+
 .control-panel {
-  margin-top: auto;
   border-top: 1px solid var(--outline);
   padding: 20px 24px;
   display: flex;

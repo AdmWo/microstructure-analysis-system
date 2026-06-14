@@ -8,9 +8,14 @@
       :active-step="activePipelineStep"
       :stage-title="currentStageTitle"
       :stage-description="currentStageDesc"
+      :images="images"
+      :active-image-index="activeImageIndex"
       @step="goToPipelineStep"
       @prev="handlePrevStage"
       @next="handleNextStage"
+      @select-image="setActiveImage"
+      @delete-image="deleteImage"
+      @open-file-picker="openFilePicker"
     >
       <!-- Step 1: Obraz (List & upload of multiple images) -->
       <template v-if="currentStage === 1">

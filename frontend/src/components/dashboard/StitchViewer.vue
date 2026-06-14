@@ -1,18 +1,5 @@
 <template>
   <section class="viewer-shell" @drop="emit('drop', $event)" @dragover="emit('dragover', $event)" @dragleave="emit('dragleave')">
-    <!-- Thumbnail toggle button (floating in top left) -->
-    <button
-      v-if="images && images.length > 0 && currentStage > 1"
-      type="button"
-      class="thumbnail-toggle-trigger"
-      @click="showThumbnailStrip = !showThumbnailStrip"
-      :title="showThumbnailStrip ? 'Ukryj listę zdjęć' : 'Pokaż listę zdjęć'"
-    >
-      <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-        <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z" />
-      </svg>
-      <span>{{ showThumbnailStrip ? 'Ukryj zdjęcia' : 'Zdjęcia' }}</span>
-    </button>
 
     <!-- STAGE 1: Grid Gallery View -->
     <div v-if="currentStage === 1 && images && images.length > 0" class="viewer-grid-mode">
@@ -242,31 +229,7 @@
         </div>
       </div>
 
-      <!-- Bottom Thumbnail Strip (Active in Stages 2-6) -->
-      <div v-if="images && images.length > 0" class="viewer-thumbnail-strip" :class="{ visible: showThumbnailStrip }">
-        <div
-          v-for="(img, index) in images"
-          :key="img.id"
-          class="thumbnail-card"
-          :class="{ active: index === activeImageIndex }"
-          @click="emit('select-image', index)"
-        >
-          <div class="thumbnail-preview-container">
-            <img :src="img.localPreview" class="thumbnail-img" />
-            <div
-              v-if="img.params?.roi && img.imageNatural?.width && img.imageNatural?.height"
-              class="thumbnail-roi-outline"
-              :style="getRoiOutlineStyle(img, 76 / 55)"
-            ></div>
-          </div>
-          <span class="thumbnail-name" :title="img.name">{{ img.name }}</span>
-          <button type="button" class="thumbnail-delete-btn" @click.stop="emit('delete-image', index)" title="Usuń obraz">×</button>
-        </div>
-        <div class="thumbnail-card add-card" @click="emit('open-file-picker')">
-          <span class="add-icon">+</span>
-          <span class="add-text">Dodaj</span>
-        </div>
-      </div>
+
     </template>
   </section>
 </template>
@@ -276,7 +239,6 @@ import { computed, ref } from 'vue'
 import { useWorkflowStore } from '../../stores/workflow'
 
 const workflow = useWorkflowStore()
-const showThumbnailStrip = ref(false)
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
@@ -814,207 +776,6 @@ function getRoiOutlineStyle(img, containerAspect = 1.6) {
 
 .gallery-card-status.has-result {
   color: #10b981;
-}
-
-/* Thumbnail strip styles */
-.viewer-thumbnail-strip {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 110;
-  background: rgba(18, 18, 20, 0.82);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  gap: 12px;
-  padding: 10px 14px;
-  height: 120px;
-  min-height: 120px;
-  align-items: center;
-  overflow-x: auto;
-  overflow-y: hidden;
-  transform: translateY(100%);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.45) rgba(255, 255, 255, 0.08);
-}
-
-.viewer-thumbnail-strip.visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.thumbnail-card {
-  position: relative;
-  width: 90px;
-  height: 95px;
-  min-width: 90px;
-  background: #1c1c1f;
-  border: 1px solid #3c494e;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.thumbnail-card:hover {
-  border-color: var(--primary);
-  background: #232328;
-}
-
-.thumbnail-card.active {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, #1c1c1f);
-}
-
-.thumbnail-preview-container {
-  position: relative;
-  width: 100%;
-  height: 55px;
-  background: #000;
-  border-radius: 4px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.thumbnail-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.thumbnail-roi-outline {
-  position: absolute;
-  border: 1.5px solid #ef4444; /* red ROI border */
-  background-color: rgba(239, 68, 68, 0.20);
-  box-sizing: border-box;
-}
-
-.thumbnail-name {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.95);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 4px;
-}
-
-.thumbnail-delete-btn {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
-  border: none;
-  font-size: 10px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 10;
-}
-
-.thumbnail-card:hover .thumbnail-delete-btn {
-  opacity: 1;
-}
-
-.thumbnail-card.add-card {
-  border: 1px dashed #3c494e;
-  background: transparent;
-  justify-content: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  gap: 4px;
-}
-
-.add-icon {
-  font-size: 20px;
-  font-weight: bold;
-  color: var(--text-soft);
-}
-
-.add-text {
-  font-size: 9px;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  font-weight: bold;
-  letter-spacing: 0.05em;
-}
-
-.thumbnail-card.add-card:hover .add-icon,
-.thumbnail-card.add-card:hover .add-text {
-  color: var(--primary);
-}
-
-/* Floating toggle trigger button */
-.thumbnail-toggle-trigger {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 120;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 6px 12px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font: 600 10px 'Space Grotesk', sans-serif;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: all 0.2s ease;
-}
-
-.thumbnail-toggle-trigger:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-text);
-  box-shadow: 0 4px 12px rgba(0, 209, 255, 0.25);
-}
-
-/* Custom premium scrollbar for filmstrip */
-.viewer-thumbnail-strip::-webkit-scrollbar {
-  height: 6px;
-}
-
-.viewer-thumbnail-strip::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 99px;
-}
-
-.viewer-thumbnail-strip::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.45);
-  border-radius: 99px;
-}
-
-.viewer-thumbnail-strip::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.75);
 }
 </style>
 
