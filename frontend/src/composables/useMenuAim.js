@@ -58,7 +58,7 @@ export function useMenuAim(options = {}) {
    * Check if current coordinate (x, y) falls within the Safe Triangle
    * formed by the previous cursor position and the open submenu's vertical edge.
    */
-  const checkMouseInTriangle = (x, y) => {
+  const checkMouseInTriangle = (x, y, enforceDirection = true) => {
     if (!submenuRef.value) return false
     
     const el = submenuRef.value.el || submenuRef.value.$el || submenuRef.value
@@ -68,13 +68,15 @@ export function useMenuAim(options = {}) {
     if (rect.width === 0 || rect.height === 0) return false
 
     // Ensure mouse is moving in the direction of the submenu (from trigger towards submenu)
-    const prevLoc = mouseLocs.value[0]
-    if (prevLoc) {
-      if (submenuDirection === 'left' && x >= prevLoc.x) {
-        return false // Moving right or vertically: not aiming at submenu
-      }
-      if (submenuDirection === 'right' && x <= prevLoc.x) {
-        return false // Moving left or vertically: not aiming at submenu
+    if (enforceDirection) {
+      const prevLoc = mouseLocs.value[0]
+      if (prevLoc) {
+        if (submenuDirection === 'left' && x >= prevLoc.x) {
+          return false // Moving right or vertically: not aiming at submenu
+        }
+        if (submenuDirection === 'right' && x <= prevLoc.x) {
+          return false // Moving left or vertically: not aiming at submenu
+        }
       }
     }
 
@@ -150,12 +152,21 @@ export function useMenuAim(options = {}) {
     const x = currentLoc ? currentLoc.x : 0
     const y = currentLoc ? currentLoc.y : 0
 
-    if (isMouseInSubmenu.value || checkMouseInTriangle(x, y)) {
-      clearCloseTimeout()
-      pendingCloseCallback = closeCallback
+    pendingCloseCallback = closeCallback
+
+    const isInside = isMouseInSubmenu.value || checkMouseInTriangle(x, y, false)
+
+    if (isInside) {
+      if (closeTimeoutId) {
+        clearTimeout(closeTimeoutId)
+        closeTimeoutId = null
+      }
     } else {
-      clearCloseTimeout()
-      closeCallback()
+      if (!closeTimeoutId) {
+        closeTimeoutId = setTimeout(() => {
+          triggerClose()
+        }, delay)
+      }
     }
   }
 
@@ -168,7 +179,8 @@ export function useMenuAim(options = {}) {
       mouseLocs.value.shift()
     }
 
-    const isInside = checkMouseInTriangle(e.clientX, e.clientY)
+    const isInsideForSwitch = checkMouseInTriangle(e.clientX, e.clientY, true)
+    const isInsideForClose = checkMouseInTriangle(e.clientX, e.clientY, false)
 
     // Clear triangle points if we are inside the submenu itself
     if (isMouseInSubmenu.value) {
@@ -177,7 +189,7 @@ export function useMenuAim(options = {}) {
 
     // Case 1: Pending item switch
     if (pendingActivation) {
-      if (!isInside) {
+      if (!isInsideForSwitch) {
         triggerPending()
       } else {
         // Reset activation timeout because they are still moving inside the safe triangle
@@ -190,8 +202,17 @@ export function useMenuAim(options = {}) {
 
     // Case 2: Pending menu close
     if (pendingCloseCallback) {
-      if (!isInside && !isMouseInSubmenu.value) {
-        triggerClose()
+      if (isInsideForClose || isMouseInSubmenu.value) {
+        if (closeTimeoutId) {
+          clearTimeout(closeTimeoutId)
+          closeTimeoutId = null
+        }
+      } else {
+        if (!closeTimeoutId) {
+          closeTimeoutId = setTimeout(() => {
+            triggerClose()
+          }, delay)
+        }
       }
     }
   }
@@ -207,6 +228,9 @@ export function useMenuAim(options = {}) {
     if (anchorCoords) {
       triggerAnchor.value = anchorCoords
     }
+
+    // Clear any pending close timer/callback since we are hovering a menu item
+    clearCloseTimeout()
 
     // If we're hovering the already active item, cancel any pending activation of other items
     if (activeItemId.value === itemId) {
