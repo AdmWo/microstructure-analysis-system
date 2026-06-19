@@ -123,6 +123,13 @@
           <select id="binarization-method" name="binarization_method" v-model="params.binarization_method">
             <option value="otsu">Otsu — automatyczny prog</option>
             <option value="manual">Reczny prog</option>
+            <option value="ml">Machine Learning Segmentation</option>
+          </select>
+        </label>
+        <label v-if="params.binarization_method === 'ml'">
+          <span>Model segmentacji ML</span>
+          <select id="ml-model-name" name="ml_model_name" v-model="params.ml_model_name">
+            <option value="unet_resnet18_baseline">U-Net ResNet18 (Baseline)</option>
           </select>
         </label>
         <label :class="{ disabled: params.binarization_method !== 'manual' }">
@@ -400,6 +407,7 @@ const params = reactive({
   denoise_kernel_size: 5,
   binarization_method: 'otsu',
   manual_threshold: 120,
+  ml_model_name: 'unet_resnet18_baseline',
   morph_open_iterations: 1,
   morph_close_iterations: 1,
 })
@@ -655,6 +663,7 @@ async function addFiles(filesList) {
       denoise_kernel_size: 5,
       binarization_method: 'otsu',
       manual_threshold: 120,
+      ml_model_name: 'unet_resnet18_baseline',
       morph_open_iterations: 1,
       morph_close_iterations: 1,
     }
@@ -747,6 +756,7 @@ function deleteImage(index) {
       denoise_kernel_size: 5,
       binarization_method: 'otsu',
       manual_threshold: 120,
+      ml_model_name: 'unet_resnet18_baseline',
       morph_open_iterations: 1,
       morph_close_iterations: 1,
     })
@@ -1406,6 +1416,7 @@ function exportAnalysis() {
         denoise_kernel_size: img.params.denoise_kernel_size,
         binarization_method: img.params.binarization_method,
         manual_threshold: img.params.manual_threshold,
+        ml_model_name: img.params.ml_model_name || 'unet_resnet18_baseline',
         morph_open_iterations: img.params.morph_open_iterations,
         morph_close_iterations: img.params.morph_close_iterations,
       },

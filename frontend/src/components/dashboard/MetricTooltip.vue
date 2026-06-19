@@ -1,26 +1,35 @@
 <template>
-  <div
-    v-if="visible"
-    class="custom-tooltip-popup"
-    :style="{ top: `${top}px`, left: `${left}px` }"
-    @mouseenter="emit('mouseenter')"
-    @mouseleave="emit('mouseleave')"
-  >
-    <div class="tooltip-header">{{ title }}</div>
-    <div class="tooltip-body">{{ description }}</div>
-    <div v-if="formula" class="tooltip-formula">
-      <span class="formula-label">Równanie:</span>
-      <div class="formula-latex" v-html="renderedFormula" />
+  <Transition name="fade">
+    <div
+      v-if="visible"
+      ref="tooltipRef"
+      class="custom-tooltip-popup"
+      :style="{ top: `${top}px`, left: `${left}px` }"
+      @mouseenter="emit('mouseenter')"
+      @mouseleave="emit('mouseleave')"
+    >
+      <div class="tooltip-header">{{ title }}</div>
+      <div class="tooltip-body">{{ description }}</div>
+      <div v-if="formula" class="tooltip-formula">
+        <span class="formula-label">Równanie:</span>
+        <div class="formula-latex" v-html="renderedFormula" />
+      </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
 const emit = defineEmits(['mouseenter', 'mouseleave'])
+
+const tooltipRef = ref(null)
+
+defineExpose({
+  el: tooltipRef
+})
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -140,5 +149,17 @@ const renderedFormula = computed(() => {
 
 :global(.theme-light .formula-latex .katex) {
   color: #00488d; /* Force high-contrast primary color for LaTeX formulas in light mode */
+}
+
+/* Fade Transition for smooth entry/exit */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translate(-102%, -50%) scale(0.96);
 }
 </style>

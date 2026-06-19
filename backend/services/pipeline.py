@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 
 from schemas import AnalysisParams, RoiSelection
+from services.ml_models import model_manager
 
 
 def decode_image(file_bytes: bytes) -> np.ndarray:
@@ -43,11 +44,15 @@ def apply_denoise(gray: np.ndarray, params: AnalysisParams) -> np.ndarray:
     return cv2.medianBlur(gray, kernel)
 
 
-def binarize(gray: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, int]:
-    """Segment pores as white in mask using Otsu or manual threshold."""
+def binarize(gray: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, int | None]:
+    """Segment pores as white in mask using Otsu, manual threshold, or ML model."""
     if params.binarization_method == "manual":
         _, mask = cv2.threshold(gray, params.manual_threshold, 255, cv2.THRESH_BINARY_INV)
         return mask, params.manual_threshold
+
+    if params.binarization_method == "ml":
+        mask = model_manager.segment(params.ml_model_name, gray)
+        return mask, None
 
     thresh_val, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     return mask, int(thresh_val)
@@ -205,7 +210,7 @@ def encode_image_b64(img: np.ndarray, fmt: str = ".png") -> str:
 
 
 def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[
-    np.ndarray, np.ndarray, int, float, float, int, float | None, float | None, float | None,
+    np.ndarray, np.ndarray, int, float, float, int | None, float | None, float | None, float | None,
     float | None, float | None, float | None, float | None, float | None, float | None
 ]:
     """Execute the staged scientific workflow and return ROI/mask/stats."""

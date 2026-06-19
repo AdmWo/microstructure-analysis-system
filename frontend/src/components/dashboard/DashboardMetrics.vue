@@ -1,5 +1,5 @@
 <template>
-  <aside ref="panelRef" class="metrics-panel">
+  <aside ref="panelRef" class="metrics-panel" @mouseleave="handleMouseLeavePanel">
     <IntensityHistogram
       :histogram-bins="histogramBins"
       :threshold-percent="thresholdPercent"
@@ -44,20 +44,20 @@
       <div class="metric-group">
         <h5 class="metric-group-title">Globalne szacunki</h5>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'aa')">Ułamek pow. (A_A)</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'aa')" @mouseleave="hideTooltip">Ułamek pow. (A_A)</span>
           <strong>{{ aaPercent !== null ? `${aaPercent.toFixed(2)}%` : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'count')">Liczba porów</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'count')" @mouseleave="hideTooltip">Liczba porów</span>
           <strong>{{ poreCount !== null ? (Number.isInteger(poreCount) ? poreCount : poreCount.toFixed(1)) : 'brak danych' }}</strong>
         </div>
         <template v-if="scaleEnabled && totalRoiAreaPhysical !== null">
           <div class="metric-row">
-            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roi')">Obszar ROI</span>
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roi')" @mouseleave="hideTooltip">Obszar ROI</span>
             <strong>{{ `${totalRoiAreaPhysical.toFixed(2)} ${scaleUnit}²` }}</strong>
           </div>
           <div class="metric-row">
-            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'density')">Gęstość p. (N_A)</span>
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'density')" @mouseleave="hideTooltip">Gęstość p. (N_A)</span>
             <strong>
               {{ poreDensityNA !== null ? poreDensityNA.toFixed(2) : '0.00' }}
               <small style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
@@ -72,15 +72,15 @@
       <div v-if="scaleEnabled" class="metric-group">
         <h5 class="metric-group-title">Rozkład wielkości porów</h5>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'poreArea')">Śr. obszar poru</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'poreArea')" @mouseleave="hideTooltip">Śr. obszar poru</span>
           <strong>{{ averagePoreAreaPhysical !== null ? `${averagePoreAreaPhysical.toFixed(2)} ${scaleUnit}²` : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd1')">Średnica d_1 (obwód)</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd1')" @mouseleave="hideTooltip">Średnica d_1 (obwód)</span>
           <strong>{{ avgD1CircularityPerimeter !== null ? `${avgD1CircularityPerimeter.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd2')">Średnica d_2 (pole)</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd2')" @mouseleave="hideTooltip">Średnica d_2 (pole)</span>
           <strong>{{ avgD2CircularityArea !== null ? `${avgD2CircularityArea.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
         </div>
       </div>
@@ -89,19 +89,19 @@
       <div class="metric-group">
         <h5 class="metric-group-title">Wskaźniki kształtu porów</h5>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'edge')">Współczynnik brzegu</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'edge')" @mouseleave="hideTooltip">Współczynnik brzegu</span>
           <strong>{{ avgEdgeIndicator !== null ? avgEdgeIndicator.toFixed(3) : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roundness')">Okrągłość elipsy</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roundness')" @mouseleave="hideTooltip">Okrągłość elipsy</span>
           <strong>{{ avgRoundnessEllipse !== null ? avgRoundnessEllipse.toFixed(3) : 'brak danych' }}</strong>
         </div>
         <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'malinowska')">Współczynnik Malinowskiej</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'malinowska')" @mouseleave="hideTooltip">Współczynnik Malinowskiej</span>
           <strong>{{ avgMalinowskaFactor !== null ? avgMalinowskaFactor.toFixed(3) : 'brak danych' }}</strong>
         </div>
         <div v-if="scaleEnabled" class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'shape')">Wskaźnik kształtu</span>
+          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'shape')" @mouseleave="hideTooltip">Wskaźnik kształtu</span>
           <strong>
             {{ avgShapeFactorRaw !== null ? avgShapeFactorRaw.toFixed(4) : 'brak danych' }}
             <small v-if="avgShapeFactorRaw !== null" style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
@@ -114,7 +114,7 @@
  
     <section class="metric-card">
       <div v-for="metric in metricCards" :key="metric.label" class="metric-row">
-        <span class="tooltip-trigger" @mouseenter="showTooltip($event, metric.key)">{{ metric.label }}</span>
+        <span class="tooltip-trigger" @mouseenter="showTooltip($event, metric.key)" @mouseleave="hideTooltip">{{ metric.label }}</span>
         <strong>{{ metric.value }}</strong>
       </div>
     </section>
@@ -159,6 +159,7 @@
  
   <!-- Custom Tooltip Popup -->
   <MetricTooltip
+    ref="submenuRef"
     :visible="tooltip.visible"
     :title="tooltip.title"
     :description="tooltip.description"
@@ -168,12 +169,34 @@
     @mouseenter="onTooltipMouseEnter"
     @mouseleave="onTooltipMouseLeave"
   />
+
+  <!-- Prediction Cone SVG Debug Overlay for Thesis Screenshots -->
+  <teleport to="body">
+    <svg
+      v-if="debugConeActive && trianglePoints"
+      style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;"
+    >
+      <!-- Draw Cone Polygon -->
+      <polygon
+        :points="`${trianglePoints.a.x},${trianglePoints.a.y} ${trianglePoints.b.x},${trianglePoints.b.y} ${trianglePoints.c.x},${trianglePoints.c.y}`"
+        fill="rgba(0, 209, 255, 0.12)"
+        stroke="rgba(0, 209, 255, 0.55)"
+        stroke-width="1.5"
+        stroke-dasharray="4 3"
+      />
+      <!-- Draw Vertices -->
+      <circle :cx="trianglePoints.a.x" :cy="trianglePoints.a.y" r="4.5" fill="#00d1ff" stroke="#ffffff" stroke-width="1" />
+      <circle :cx="trianglePoints.b.x" :cy="trianglePoints.b.y" r="4.5" fill="#00d1ff" stroke="#ffffff" stroke-width="1" />
+      <circle :cx="trianglePoints.c.x" :cy="trianglePoints.c.y" r="4.5" fill="#00d1ff" stroke="#ffffff" stroke-width="1" />
+    </svg>
+  </teleport>
 </template>
  
 <script setup>
 import { ref, reactive } from 'vue'
 import MetricTooltip from './MetricTooltip.vue'
 import IntensityHistogram from './IntensityHistogram.vue'
+import { useMenuAim } from '../../composables/useMenuAim'
  
 const emit = defineEmits(['toggle-swap', 'download-mask', 'download-roi', 'update-threshold', 'toggle-thickness', 'toggle-display-mode'])
  
@@ -224,6 +247,21 @@ const tooltip = reactive({
   formula: '',
   top: 0,
   left: 0,
+})
+
+const {
+  submenuRef,
+  onItemHover,
+  onMouseLeaveMenu,
+  requestClose,
+  debugConeActive,
+  trianglePoints,
+  handleSubmenuMouseEnter,
+  handleSubmenuMouseLeave
+} = useMenuAim({
+  submenuDirection: 'left',
+  delay: 300,
+  isVisible: () => tooltip.visible
 })
 
 const TOOLTIP_TEXTS = {
@@ -302,30 +340,43 @@ const TOOLTIP_TEXTS = {
 let hideTimeoutId = null
 
 function showTooltip(e, type) {
-  if (hideTimeoutId) {
-    clearTimeout(hideTimeoutId)
-    hideTimeoutId = null
-  }
-  if (!panelRef.value) return
-  const panelRect = panelRef.value.getBoundingClientRect()
   const spanRect = e.target.getBoundingClientRect()
-  const data = TOOLTIP_TEXTS[type] || { title: '', description: '', formula: '' }
+  const anchorCoords = {
+    x: spanRect.left + spanRect.width / 2,
+    y: spanRect.top + spanRect.height / 2
+  }
 
-  tooltip.title = data.title
-  tooltip.description = data.description
-  tooltip.formula = data.formula
-  tooltip.top = spanRect.top + spanRect.height / 2
-  tooltip.left = panelRect.left - 12
-  tooltip.visible = true
+  onItemHover(type, () => {
+    if (hideTimeoutId) {
+      clearTimeout(hideTimeoutId)
+      hideTimeoutId = null
+    }
+    if (!panelRef.value) return
+    const panelRect = panelRef.value.getBoundingClientRect()
+    const data = TOOLTIP_TEXTS[type] || { title: '', description: '', formula: '' }
+
+    tooltip.title = data.title
+    tooltip.description = data.description
+    tooltip.formula = data.formula
+    tooltip.top = spanRect.top + spanRect.height / 2
+    tooltip.left = panelRect.left - 12
+    tooltip.visible = true
+  }, anchorCoords)
+}
+
+function handleMouseLeavePanel() {
+  onMouseLeaveMenu()
+  hideTooltip()
 }
 
 function hideTooltip() {
-  hideTimeoutId = setTimeout(() => {
+  requestClose(() => {
     tooltip.visible = false
-  }, 250)
+  })
 }
 
 function onTooltipMouseEnter() {
+  handleSubmenuMouseEnter()
   if (hideTimeoutId) {
     clearTimeout(hideTimeoutId)
     hideTimeoutId = null
@@ -333,6 +384,7 @@ function onTooltipMouseEnter() {
 }
 
 function onTooltipMouseLeave() {
+  handleSubmenuMouseLeave()
   tooltip.visible = false
 }
 </script>

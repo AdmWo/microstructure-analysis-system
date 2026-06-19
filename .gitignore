@@ -1,8 +1,31 @@
-__pycache__/
+# Środowisko wirtualne Pythona
+.venv/
+backend/.venv/
 venv/
-.env
+ENV/
+
+# Zależności i dystrybucja Node.js
 node_modules/
 dist/
-.DS_Store
 frontend/dist/
+
+# Pliki binarne, kompilaty i biblioteki systemowe (zapobiega wrzucaniu dużych bibliotek PyTorcha)
+*.dll
+*.so
+*.dylib
+*.py[cod]
+__pycache__/
 backend/__pycache__/
+
+# Wygenerowane pliki i zestawy danych treningowych
+backend/training/masks/
+backend/training/images/
+backend/training/unet_checkpoint.pth
+
+# Środowisko i konfiguracje lokalne edytorów
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -38,8 +38,9 @@ class AnalysisParams(BaseModel):
     denoise_enabled: bool = True
     denoise_method: str = Field(default="median", pattern="^(median|gaussian)$")
     denoise_kernel_size: int = Field(default=5, ge=3, le=31)
-    binarization_method: str = Field(default="otsu", pattern="^(otsu|manual)$")
+    binarization_method: str = Field(default="otsu", pattern="^(otsu|manual|ml)$")
     manual_threshold: int = Field(default=120, ge=0, le=255)
+    ml_model_name: str = Field(default="unet_resnet18_baseline")
     morph_open_iterations: int = Field(default=1, ge=0, le=20)
     morph_close_iterations: int = Field(default=1, ge=0, le=20)
     scale_enabled: bool = False
