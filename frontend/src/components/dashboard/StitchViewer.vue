@@ -998,4 +998,18 @@ function getRoiOutlineStyle(img, containerAspect = 1.6) {
   background: #ffa81a;
   cursor: grabbing;
 }
+
+@media (max-width: 1100px) {
+  .viewer-shell {
+    height: 60vh !important;
+    min-height: 480px !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .viewer-shell {
+    height: 50vh !important;
+    min-height: 380px !important;
+  }
+}
 </style>

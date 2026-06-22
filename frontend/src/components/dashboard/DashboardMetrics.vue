@@ -150,7 +150,7 @@
     </section>
 
  
-    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+    <div class="bottom-metrics-container">
       <!-- Performance Statistics -->
       <section v-if="totalExecutionTimeMs !== null" class="metric-card performance-card" style="border-color: color-mix(in srgb, var(--primary) 30%, var(--outline)); padding: 8px 10px; border-radius: 4px; margin-top: 0;">
         <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10.5px; font-family: 'Space Grotesk', sans-serif; color: var(--text-soft); font-weight: 500;">
@@ -603,19 +603,41 @@ function onTooltipMouseLeave() {
   cursor: pointer;
 }
 
-@media (max-width: 1100px) {
+.bottom-metrics-container {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 1100px) and (min-width: 861px) {
   .metrics-panel {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  .metrics-panel .status {
-    grid-column: 1 / -1;
+  .metrics-panel > :first-child {
+    grid-column: 1 / -1 !important;
+  }
+
+  .bottom-metrics-container {
+    margin-top: 0 !important;
   }
 }
 
 @media (max-width: 860px) {
   .metrics-panel {
-    grid-template-columns: 1fr;
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .bottom-metrics-container {
+    margin-top: 0 !important;
   }
 }
 </style>

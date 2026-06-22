@@ -735,6 +735,7 @@ function getRoiOutlineStyle(img, containerAspect = 1.6) {
 @media (max-width: 1100px) {
   .stitch-side-nav {
     width: 250px;
+    overflow-y: auto !important;
   }
 }
 
@@ -746,6 +747,11 @@ function getRoiOutlineStyle(img, containerAspect = 1.6) {
     border-right: 0;
     border-bottom: 1px solid var(--outline);
     overflow: auto;
+  }
+
+  .sidebar-thumbnails-container {
+    grid-template-rows: 72px !important;
+    height: 94px !important;
   }
 }
 </style>

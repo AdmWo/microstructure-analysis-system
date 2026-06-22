@@ -89,4 +89,21 @@ const emit = defineEmits(['toggle-theme', 'open-help'])
   letter-spacing: 0.06em;
   cursor: pointer;
 }
+
+@media (max-width: 480px) {
+  .stitch-topbar {
+    padding: 0 12px !important;
+  }
+  .brand-title {
+    font-size: 0.75rem !important;
+    letter-spacing: 0.04em !important;
+  }
+  .top-icons {
+    gap: 8px !important;
+  }
+  .top-icons .icon-btn {
+    padding: 0.25rem 0.4rem !important;
+    font-size: 9px !important;
+  }
+}
 </style>

@@ -183,6 +183,7 @@
     <main class="stitch-main">
       <div class="content-row">
         <StitchViewer
+          class="main-viewer"
           :current-stage="currentStage"
           :roi-data-url="roiDataUrl"
           :is-dragging="isDragging"
@@ -222,7 +223,51 @@
           @delete-image="deleteImage"
         />
 
+        <div class="bottom-bar">
+          <div class="bottom-viewer-controls">
+            <button type="button" class="bottom-btn" @click="zoomIn" title="Powiększ">+</button>
+            <button type="button" class="bottom-btn" @click="zoomOut" title="Pomniejsz">-</button>
+            <button type="button" class="bottom-btn" @click="resetView">Oddal</button>
+            
+            <!-- Measurement tool button -->
+            <button
+              v-if="workflow.scalePxLength > 0"
+              type="button"
+              class="bottom-btn"
+              :class="{ 'btn-active': workflow.interactionMode === 'measure' }"
+              @click="toggleMeasurementMode"
+              title="Zmierz odległość na obrazie"
+            >
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                <path d="M19.5 2H4.5C3.12 2 2 3.12 2 4.5v15C2 20.88 3.12 22 4.5 22h15c1.38 0 2.5-1.12 2.5-2.5v-15C22 3.12 20.88 2 19.5 2zM20 19.5c0 .28-.22.5-.5.5H4.5c-.28 0-.5-.22-.5-.5v-15c0-.28.22-.5.5-.5h15c.28 0 .5.22.5.5v15zM7 6h2v3H7zm0 5h2v3H7zm0 5h2v2H7zm5-10h5v2h-5zm0 5h5v2h-5zm0 5h5v2h-5z"/>
+              </svg>
+              {{ workflow.interactionMode === 'measure' ? 'Rysuj pomiar...' : 'Zmierz odległość' }}
+            </button>
+            <button
+              v-if="workflow.measureLineCoords"
+              type="button"
+              class="bottom-btn-mini"
+              @click="clearMeasurement"
+              title="Wyczyść pomiar"
+              style="margin-left: 4px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 4px; font-size: 11px; padding: 2px 6px; cursor: pointer;"
+            >
+              Usuń pomiar
+            </button>
+
+            <button v-if="maskDataUrl && activePipelineStep === 6" type="button" class="bottom-btn" @click="toggleSwap" :class="{ 'btn-active': isSwapped }">
+              {{ isSwapped ? 'Pokaż oryginał' : 'Pokaż maskę' }}
+            </button>
+          </div>
+
+          <div class="bottom-api-status" :class="health.status">
+            <span class="status-dot"></span>
+            <span class="status-text">{{ health.message }}</span>
+            <button type="button" class="bottom-btn-mini" @click="checkHealth">Odśwież</button>
+          </div>
+        </div>
+
         <DashboardMetrics
+          class="metrics-sidebar"
           :histogram-bins="histogramBins"
           :threshold-percent="histogramThresholdPercent"
           :threshold-value="activeThresholdValue"
@@ -268,49 +313,6 @@
           @toggle-thickness="toggleHistogramThickness"
           @toggle-display-mode="showAverages = $event"
         />
-      </div>
-
-      <div class="bottom-bar">
-        <div class="bottom-viewer-controls">
-          <button type="button" class="bottom-btn" @click="zoomIn" title="Powiększ">+</button>
-          <button type="button" class="bottom-btn" @click="zoomOut" title="Pomniejsz">-</button>
-          <button type="button" class="bottom-btn" @click="resetView">Oddal</button>
-          
-          <!-- Measurement tool button -->
-          <button
-            v-if="workflow.scalePxLength > 0"
-            type="button"
-            class="bottom-btn"
-            :class="{ 'btn-active': workflow.interactionMode === 'measure' }"
-            @click="toggleMeasurementMode"
-            title="Zmierz odległość na obrazie"
-          >
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
-              <path d="M19.5 2H4.5C3.12 2 2 3.12 2 4.5v15C2 20.88 3.12 22 4.5 22h15c1.38 0 2.5-1.12 2.5-2.5v-15C22 3.12 20.88 2 19.5 2zM20 19.5c0 .28-.22.5-.5.5H4.5c-.28 0-.5-.22-.5-.5v-15c0-.28.22-.5.5-.5h15c.28 0 .5.22.5.5v15zM7 6h2v3H7zm0 5h2v3H7zm0 5h2v2H7zm5-10h5v2h-5zm0 5h5v2h-5zm0 5h5v2h-5z"/>
-            </svg>
-            {{ workflow.interactionMode === 'measure' ? 'Rysuj pomiar...' : 'Zmierz odległość' }}
-          </button>
-          <button
-            v-if="workflow.measureLineCoords"
-            type="button"
-            class="bottom-btn-mini"
-            @click="clearMeasurement"
-            title="Wyczyść pomiar"
-            style="margin-left: 4px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 4px; font-size: 11px; padding: 2px 6px; cursor: pointer;"
-          >
-            Usuń pomiar
-          </button>
-
-          <button v-if="maskDataUrl && activePipelineStep === 6" type="button" class="bottom-btn" @click="toggleSwap" :class="{ 'btn-active': isSwapped }">
-            {{ isSwapped ? 'Pokaż oryginał' : 'Pokaż maskę' }}
-          </button>
-        </div>
-
-        <div class="bottom-api-status" :class="health.status">
-          <span class="status-dot"></span>
-          <span class="status-text">{{ health.message }}</span>
-          <button type="button" class="bottom-btn-mini" @click="checkHealth">Odśwież</button>
-        </div>
       </div>
     </main>
 
@@ -2121,6 +2123,22 @@ function handleNextStage() {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) var(--surface);
+}
+
+.stitch-main::-webkit-scrollbar {
+  width: 6px;
+}
+.stitch-main::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+.stitch-main::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 3px;
+}
+.stitch-main::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .content-row {
@@ -2128,11 +2146,19 @@ function handleNextStage() {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-rows: 1fr auto;
   gap: 12px;
   padding: 6px 12px 12px;
 }
 
+.main-viewer {
+  grid-column: 1;
+  grid-row: 1;
+}
+
 .bottom-bar {
+  grid-column: 1;
+  grid-row: 2;
   height: 48px;
   min-height: 48px;
   max-height: 48px;
@@ -2143,6 +2169,11 @@ function handleNextStage() {
   justify-content: space-between;
   padding: 0 24px;
   box-sizing: border-box;
+}
+
+.metrics-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .bottom-viewer-controls {
@@ -2338,33 +2369,98 @@ function handleNextStage() {
 }
 
 @media (max-width: 1100px) {
+  .stitch-dashboard {
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
   .stitch-main {
     margin-left: 250px;
+    height: calc(100vh - 56px) !important;
+    overflow-y: auto !important;
   }
 
   .content-row {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .main-viewer {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .bottom-bar {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    border-top: 1px solid var(--outline) !important;
+    border-bottom: 1px solid var(--outline) !important;
+  }
+
+  .metrics-sidebar {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
   }
 }
 
 @media (max-width: 860px) {
   .stitch-dashboard {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    height: auto;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    overflow: hidden !important;
   }
 
   .stitch-main {
-    margin-left: 0;
-    margin-top: 0;
-    height: auto;
-    min-height: 0;
-    flex: 1;
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
   }
 
   .content-row {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .main-viewer {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .bottom-bar {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    border-top: 1px solid var(--outline) !important;
+    border-bottom: 1px solid var(--outline) !important;
+  }
+
+  .metrics-sidebar {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+  }
+}
+
+@media (max-width: 500px) {
+  .bottom-bar {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    padding: 8px !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  .bottom-viewer-controls {
+    width: 100% !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
   }
 }
 </style>
