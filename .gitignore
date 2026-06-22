@@ -9,7 +9,7 @@ node_modules/
 dist/
 frontend/dist/
 
-# Pliki binarne, kompilaty i biblioteki systemowe (zapobiega wrzucaniu dużych bibliotek PyTorcha)
+# Pliki binarne, kompilaty i biblioteki systemowe
 *.dll
 *.so
 *.dylib

@@ -21,6 +21,15 @@ class AnalysisResult(BaseModel):
     avg_shape_factor_raw: float | None = None
     avg_roundness_ellipse: float | None = None
     avg_malinowska_factor: float | None = None
+    inference_time_ms: float | None = None
+    total_execution_time_ms: float | None = None
+    t_preprocess_ms: float | None = None
+    t_segment_ms: float | None = None
+    t_morphology_ms: float | None = None
+    t_stereology_ms: float | None = None
+    t_encoding_ms: float | None = None
+
+
 
 
 class RoiSelection(BaseModel):
@@ -38,7 +47,7 @@ class AnalysisParams(BaseModel):
     denoise_enabled: bool = True
     denoise_method: str = Field(default="median", pattern="^(median|gaussian)$")
     denoise_kernel_size: int = Field(default=5, ge=3, le=31)
-    binarization_method: str = Field(default="otsu", pattern="^(otsu|manual|ml)$")
+    binarization_method: str = Field(default="ml", pattern="^(otsu|manual|ml)$")
     manual_threshold: int = Field(default=120, ge=0, le=255)
     ml_model_name: str = Field(default="unet_resnet18_baseline")
     morph_open_iterations: int = Field(default=1, ge=0, le=20)

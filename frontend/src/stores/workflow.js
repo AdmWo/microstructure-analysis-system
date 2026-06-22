@@ -25,6 +25,13 @@ export const useWorkflowStore = defineStore('workflow', {
     avgTotalRoiArea: null,
     avgPoreArea: null,
     avgNa: null,
+    avgInferenceTimeMs: null,
+    avgTotalExecutionTimeMs: null,
+    avgPreprocessMs: null,
+    avgSegmentMs: null,
+    avgMorphologyMs: null,
+    avgStereologyMs: null,
+    avgEncodingMs: null,
     // Active image or single image metrics
     avgD1CircularityPerimeter: null,
     avgD2CircularityArea: null,
@@ -32,6 +39,14 @@ export const useWorkflowStore = defineStore('workflow', {
     avgShapeFactorRaw: null,
     avgRoundnessEllipse: null,
     avgMalinowskaFactor: null,
+    inferenceTimeMs: null,
+    totalExecutionTimeMs: null,
+    tPreprocessMs: null,
+    tSegmentMs: null,
+    tMorphologyMs: null,
+    tStereologyMs: null,
+    tEncodingMs: null,
+
   }),
   getters: {
     isFirstStage: (state) => state.currentStage === 1,
@@ -62,12 +77,26 @@ export const useWorkflowStore = defineStore('workflow', {
       this.avgTotalRoiArea = null
       this.avgPoreArea = null
       this.avgNa = null
+      this.avgInferenceTimeMs = null
+      this.avgTotalExecutionTimeMs = null
+      this.avgPreprocessMs = null
+      this.avgSegmentMs = null
+      this.avgMorphologyMs = null
+      this.avgStereologyMs = null
+      this.avgEncodingMs = null
       this.avgD1CircularityPerimeter = null
       this.avgD2CircularityArea = null
       this.avgEdgeIndicator = null
       this.avgShapeFactorRaw = null
       this.avgRoundnessEllipse = null
       this.avgMalinowskaFactor = null
+      this.inferenceTimeMs = null
+      this.totalExecutionTimeMs = null
+      this.tPreprocessMs = null
+      this.tSegmentMs = null
+      this.tMorphologyMs = null
+      this.tStereologyMs = null
+      this.tEncodingMs = null
     },
   },
 })

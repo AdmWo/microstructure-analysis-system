@@ -42,119 +42,201 @@
       
       <!-- Grupa 1: Globalne szacunki -->
       <div class="metric-group">
-        <h5 class="metric-group-title">Globalne szacunki</h5>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'aa')" @mouseleave="hideTooltip">Ułamek pow. (A_A)</span>
-          <strong>{{ aaPercent !== null ? `${aaPercent.toFixed(2)}%` : 'brak danych' }}</strong>
-        </div>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'count')" @mouseleave="hideTooltip">Liczba porów</span>
-          <strong>{{ poreCount !== null ? (Number.isInteger(poreCount) ? poreCount : poreCount.toFixed(1)) : 'brak danych' }}</strong>
-        </div>
-        <template v-if="scaleEnabled && totalRoiAreaPhysical !== null">
+        <h5 class="metric-group-title" @click="toggleGroup('global')" style="cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none;">
+          Globalne szacunki
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: collapsedGroups.global ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </h5>
+        <div v-show="!collapsedGroups.global">
           <div class="metric-row">
-            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roi')" @mouseleave="hideTooltip">Obszar ROI</span>
-            <strong>{{ `${totalRoiAreaPhysical.toFixed(2)} ${scaleUnit}²` }}</strong>
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'aa')" @mouseleave="hideTooltip">Ułamek pow. (A_A)</span>
+            <strong>{{ aaPercent !== null ? `${aaPercent.toFixed(2)}%` : 'brak danych' }}</strong>
           </div>
           <div class="metric-row">
-            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'density')" @mouseleave="hideTooltip">Gęstość p. (N_A)</span>
-            <strong>
-              {{ poreDensityNA !== null ? poreDensityNA.toFixed(2) : '0.00' }}
-              <small style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
-                {{ scaleUnit === 'µm' ? 'p / 10⁴ µm²' : 'p / mm²' }}
-              </small>
-            </strong>
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'count')" @mouseleave="hideTooltip">Liczba porów</span>
+            <strong>{{ poreCount !== null ? (Number.isInteger(poreCount) ? poreCount : poreCount.toFixed(1)) : 'brak danych' }}</strong>
           </div>
-        </template>
+          <template v-if="scaleEnabled && totalRoiAreaPhysical !== null">
+            <div class="metric-row">
+              <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roi')" @mouseleave="hideTooltip">Obszar ROI</span>
+              <strong>{{ `${totalRoiAreaPhysical.toFixed(2)} ${scaleUnit}²` }}</strong>
+            </div>
+            <div class="metric-row">
+              <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'density')" @mouseleave="hideTooltip">Gęstość p. (N_A)</span>
+              <strong>
+                {{ poreDensityNA !== null ? poreDensityNA.toFixed(2) : '0.00' }}
+                <small style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
+                  {{ scaleUnit === 'µm' ? 'p / 10⁴ µm²' : 'p / mm²' }}
+                </small>
+              </strong>
+            </div>
+          </template>
+        </div>
       </div>
  
       <!-- Grupa 2: Rozkład wielkości porów -->
       <div v-if="scaleEnabled" class="metric-group">
-        <h5 class="metric-group-title">Rozkład wielkości porów</h5>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'poreArea')" @mouseleave="hideTooltip">Śr. obszar poru</span>
-          <strong>{{ averagePoreAreaPhysical !== null ? `${averagePoreAreaPhysical.toFixed(2)} ${scaleUnit}²` : 'brak danych' }}</strong>
-        </div>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd1')" @mouseleave="hideTooltip">Średnica d_1 (obwód)</span>
-          <strong>{{ avgD1CircularityPerimeter !== null ? `${avgD1CircularityPerimeter.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
-        </div>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd2')" @mouseleave="hideTooltip">Średnica d_2 (pole)</span>
-          <strong>{{ avgD2CircularityArea !== null ? `${avgD2CircularityArea.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
+        <h5 class="metric-group-title" @click="toggleGroup('poreSize')" style="cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none;">
+          Rozkład wielkości porów
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: collapsedGroups.poreSize ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </h5>
+        <div v-show="!collapsedGroups.poreSize">
+          <div class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'poreArea')" @mouseleave="hideTooltip">Śr. obszar poru</span>
+            <strong>{{ averagePoreAreaPhysical !== null ? `${averagePoreAreaPhysical.toFixed(2)} ${scaleUnit}²` : 'brak danych' }}</strong>
+          </div>
+          <div class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd1')" @mouseleave="hideTooltip">Średnica d_1 (obwód)</span>
+            <strong>{{ avgD1CircularityPerimeter !== null ? `${avgD1CircularityPerimeter.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
+          </div>
+          <div class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'd2')" @mouseleave="hideTooltip">Średnica d_2 (pole)</span>
+            <strong>{{ avgD2CircularityArea !== null ? `${avgD2CircularityArea.toFixed(2)} ${scaleUnit}` : 'brak danych' }}</strong>
+          </div>
         </div>
       </div>
  
       <!-- Grupa 3: Wskaźniki kształtu porów -->
       <div class="metric-group">
-        <h5 class="metric-group-title">Wskaźniki kształtu porów</h5>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'edge')" @mouseleave="hideTooltip">Współczynnik brzegu</span>
-          <strong>{{ avgEdgeIndicator !== null ? avgEdgeIndicator.toFixed(3) : 'brak danych' }}</strong>
-        </div>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roundness')" @mouseleave="hideTooltip">Okrągłość elipsy</span>
-          <strong>{{ avgRoundnessEllipse !== null ? avgRoundnessEllipse.toFixed(3) : 'brak danych' }}</strong>
-        </div>
-        <div class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'malinowska')" @mouseleave="hideTooltip">Współczynnik Malinowskiej</span>
-          <strong>{{ avgMalinowskaFactor !== null ? avgMalinowskaFactor.toFixed(3) : 'brak danych' }}</strong>
-        </div>
-        <div v-if="scaleEnabled" class="metric-row">
-          <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'shape')" @mouseleave="hideTooltip">Wskaźnik kształtu</span>
-          <strong>
-            {{ avgShapeFactorRaw !== null ? avgShapeFactorRaw.toFixed(4) : 'brak danych' }}
-            <small v-if="avgShapeFactorRaw !== null" style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
-              {{ `1/${scaleUnit}` }}
-            </small>
-          </strong>
-        </div>
-      </div>
-    </section>
- 
-    <section class="metric-card">
-      <div v-for="metric in metricCards" :key="metric.label" class="metric-row">
-        <span class="tooltip-trigger" @mouseenter="showTooltip($event, metric.key)" @mouseleave="hideTooltip">{{ metric.label }}</span>
-        <strong>{{ metric.value }}</strong>
-      </div>
-    </section>
- 
-    <section v-if="maskDataUrl" class="metric-card" style="margin-top: auto;">
-      <div class="metric-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <h4 style="margin: 0; font: 700 10px/1 'Space Grotesk', sans-serif;">
-          {{ isSwapped ? 'Wycięty obszar (ROI)' : 'Maska segmentacji' }}
-        </h4>
-        <button
-          type="button"
-          class="swap-btn"
-          @click="emit('toggle-swap')"
-          :disabled="!canSwap"
-          style="background: var(--surface-3); border: 1px solid var(--outline); color: var(--text); font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
-          :style="isSwapped ? 'border-color: var(--primary); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent);' : ''"
-        >
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display: block;">
-            <path d="M19 8l-4 4h3v6h-6v2h8V12h3L19 8zM5 16l4-4H6V6h6V4H4v8H1l4 4z" />
+        <h5 class="metric-group-title" @click="toggleGroup('shapeFactors')" style="cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none;">
+          Wskaźniki kształtu porów
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: collapsedGroups.shapeFactors ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }">
+            <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
-          Zamień
-        </button>
+        </h5>
+        <div v-show="!collapsedGroups.shapeFactors">
+          <div class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'edge')" @mouseleave="hideTooltip">Współczynnik brzegu</span>
+            <strong>{{ avgEdgeIndicator !== null ? avgEdgeIndicator.toFixed(3) : 'brak danych' }}</strong>
+          </div>
+          <div class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'roundness')" @mouseleave="hideTooltip">Okrągłość elipsy</span>
+            <strong>{{ avgRoundnessEllipse !== null ? avgRoundnessEllipse.toFixed(3) : 'brak danych' }}</strong>
+          </div>
+          <div class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'malinowska')" @mouseleave="hideTooltip">Współczynnik Malinowskiej</span>
+            <strong>{{ avgMalinowskaFactor !== null ? avgMalinowskaFactor.toFixed(3) : 'brak danych' }}</strong>
+          </div>
+          <div v-if="scaleEnabled" class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, 'shape')" @mouseleave="hideTooltip">Wskaźnik kształtu</span>
+            <strong>
+              {{ avgShapeFactorRaw !== null ? avgShapeFactorRaw.toFixed(4) : 'brak danych' }}
+              <small v-if="avgShapeFactorRaw !== null" style="font-size: 0.75rem; font-weight: normal; opacity: 0.85; margin-left: 2px;">
+                {{ `1/${scaleUnit}` }}
+              </small>
+            </strong>
+          </div>
+        </div>
       </div>
-      <img
-        :src="isSwapped ? roiCropDataUrl : maskDataUrl"
-        :alt="isSwapped ? 'Wycięty obszar ROI' : 'Maska segmentacji'"
-        class="mask-image"
-        @click="canSwap && emit('toggle-swap')"
-        :style="{ cursor: canSwap ? 'pointer' : 'not-allowed' }"
-      />
-      <div style="margin-top: 8px; display: flex;">
-        <button
-          type="button"
-          @click="emit('download-mask')"
-          style="flex: 1; background: var(--primary); border: none; color: var(--primary-text); font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Space Grotesk', sans-serif;"
-        >
-          Zapisz
-        </button>
+
+      <!-- Grupa 4: Jasność i jakość obrazu -->
+      <div class="metric-group">
+        <h5 class="metric-group-title" @click="toggleGroup('brightness')" style="cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none;">
+          Jasność i jakość obrazu
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: collapsedGroups.brightness ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </h5>
+        <div v-show="!collapsedGroups.brightness">
+          <div v-for="metric in metricCards" :key="metric.label" class="metric-row">
+            <span class="tooltip-trigger" @mouseenter="showTooltip($event, metric.key)" @mouseleave="hideTooltip">{{ metric.label }}</span>
+            <strong>{{ metric.value }}</strong>
+          </div>
+        </div>
       </div>
     </section>
+
+ 
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+      <!-- Performance Statistics -->
+      <section v-if="totalExecutionTimeMs !== null" class="metric-card performance-card" style="border-color: color-mix(in srgb, var(--primary) 30%, var(--outline)); padding: 8px 10px; border-radius: 4px; margin-top: 0;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10.5px; font-family: 'Space Grotesk', sans-serif; color: var(--text-soft); font-weight: 500;">
+          <span v-if="inferenceTimeMs !== null && inferenceTimeMs > 0" style="color: #2f76ba; font-weight: 600; display: flex; align-items: center; gap: 3.5px;">
+            Inference: {{ inferenceTimeMs.toFixed(0) }} ms
+          </span>
+          <span v-if="inferenceTimeMs !== null && inferenceTimeMs > 0" style="opacity: 0.3; color: var(--text-muted);">|</span>
+          <span style="display: flex; align-items: center; gap: 3.5px; color: #28af4d; font-weight: 600;">
+            Total API: {{ totalExecutionTimeMs.toFixed(0) }} ms
+          </span>
+        </div>
+        
+        <!-- Detailed Breakdown -->
+        <details v-if="tPreprocessMs || tSegmentMs || tMorphologyMs || tStereologyMs || tEncodingMs" style="margin-top: 6px; border-top: 1px dashed var(--outline); padding-top: 4px; font-family: 'Space Grotesk', sans-serif; font-size: 9px; color: var(--text-soft);">
+          <summary style="cursor: pointer; text-align: center; list-style: none; outline: none; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 2px;">
+            Rozwiń szczegóły czasu
+            <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </summary>
+          <div style="display: grid; gap: 4px; margin-top: 6px; padding: 2px 4px; border-radius: 4px; background: var(--surface-3);">
+            <div v-if="tPreprocessMs" style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-soft);">Preprocessing & Denoise:</span>
+              <strong style="color: var(--text);">{{ tPreprocessMs.toFixed(1) }} ms</strong>
+            </div>
+            <div v-if="tSegmentMs" style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-soft);">Segmentation / Binarization:</span>
+              <strong style="color: var(--text);">{{ tSegmentMs.toFixed(1) }} ms</strong>
+            </div>
+            <div v-if="tMorphologyMs" style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-soft);">Morphological Cleanup:</span>
+              <strong style="color: var(--text);">{{ tMorphologyMs.toFixed(1) }} ms</strong>
+            </div>
+            <div v-if="tStereologyMs" style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-soft);">Stereology Metrics:</span>
+              <strong style="color: var(--text);">{{ tStereologyMs.toFixed(1) }} ms</strong>
+            </div>
+            <div v-if="tEncodingMs" style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-soft);">Base64 Encoding & API:</span>
+              <strong style="color: var(--text);">{{ tEncodingMs.toFixed(1) }} ms</strong>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- Maska segmentacji -->
+      <section v-if="maskDataUrl" class="metric-card" style="margin-top: 0;">
+        <div class="metric-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="margin: 0; font: 700 10px/1 'Space Grotesk', sans-serif;">
+            {{ isSwapped ? 'Wycięty obszar (ROI)' : 'Maska segmentacji' }}
+          </h4>
+          <button
+            type="button"
+            class="swap-btn"
+            @click="emit('toggle-swap')"
+            :disabled="!canSwap"
+            style="background: var(--surface-3); border: 1px solid var(--outline); color: var(--text); font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
+            :style="isSwapped ? 'border-color: var(--primary); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent);' : ''"
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" style="display: block;">
+              <path d="M19 8l-4 4h3v6h-6v2h8V12h3L19 8zM5 16l4-4H6V6h6V4H4v8H1l4 4z" />
+            </svg>
+            Zamień
+          </button>
+        </div>
+        <img
+          :src="isSwapped ? roiCropDataUrl : maskDataUrl"
+          :alt="isSwapped ? 'Wycięty obszar ROI' : 'Maska segmentacji'"
+          class="mask-image"
+          @click="canSwap && emit('toggle-swap')"
+          :style="{ cursor: canSwap ? 'pointer' : 'not-allowed' }"
+        />
+        <div style="margin-top: 8px; display: flex;">
+          <button
+            type="button"
+            @click="emit('download-mask')"
+            style="flex: 1; background: var(--primary); border: none; color: var(--primary-text); font-size: 11px; padding: 6px; cursor: pointer; border-radius: 4px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Space Grotesk', sans-serif;"
+          >
+            Zapisz
+          </button>
+        </div>
+      </section>
+    </div>
+
+
+
   </aside>
  
   <!-- Custom Tooltip Popup -->
@@ -237,7 +319,17 @@ defineProps({
   // Multiple images props
   imagesCount: { type: Number, default: 1 },
   showAverages: { type: Boolean, default: true },
+
+  // Performance props
+  inferenceTimeMs: { type: Number, default: null },
+  totalExecutionTimeMs: { type: Number, default: null },
+  tPreprocessMs: { type: Number, default: null },
+  tSegmentMs: { type: Number, default: null },
+  tMorphologyMs: { type: Number, default: null },
+  tStereologyMs: { type: Number, default: null },
+  tEncodingMs: { type: Number, default: null },
 })
+
 
 const panelRef = ref(null)
 const tooltip = reactive({
@@ -248,6 +340,18 @@ const tooltip = reactive({
   top: 0,
   left: 0,
 })
+
+const collapsedGroups = reactive({
+  global: false,
+  poreSize: false,
+  shapeFactors: false,
+  brightness: true, // collapsed by default
+})
+
+function toggleGroup(key) {
+  collapsedGroups[key] = !collapsedGroups[key]
+}
+
 
 const {
   submenuRef,

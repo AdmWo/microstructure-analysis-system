@@ -7,6 +7,7 @@ The endpoint follows the lecture workflow:
 4) Interpretation (A_A / V_V)
 """
 import json
+import time
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -62,12 +63,16 @@ async def analyze(file: UploadFile = File(...), params: str | None = Form(defaul
     except (json.JSONDecodeError, ValidationError) as e:
         raise HTTPException(422, f"Invalid params payload: {e}")
 
+    start_time = time.perf_counter()
+    perf_stats = {}
     (
         roi_img, cleaned_mask, pore_count, aa_percent, vv_percent, thresh_val,
         total_roi_area_physical, average_pore_area_physical, n_a,
-        avg_d1, avg_d2, avg_edge, avg_shape_factor, avg_roundness, avg_malinowska
-    ) = run_workflow(img, analysis_params)
+        avg_d1, avg_d2, avg_edge, avg_shape_factor, avg_roundness, avg_malinowska,
+        inference_time_ms
+    ) = run_workflow(img, analysis_params, perf_stats)
 
+    t_enc_start = time.perf_counter()
     try:
         original_b64 = encode_image_b64(img)
     except Exception:
@@ -75,6 +80,10 @@ async def analyze(file: UploadFile = File(...), params: str | None = Form(defaul
 
     roi_b64 = encode_image_b64(roi_img)
     mask_b64 = encode_image_b64(cleaned_mask)
+    t_enc_end = time.perf_counter()
+    perf_stats["t_encoding_ms"] = (t_enc_end - t_enc_start) * 1000.0
+    
+    total_execution_time_ms = (time.perf_counter() - start_time) * 1000.0
 
     return AnalysisResult(
         original_b64=original_b64,
@@ -93,4 +102,12 @@ async def analyze(file: UploadFile = File(...), params: str | None = Form(defaul
         avg_shape_factor_raw=avg_shape_factor,
         avg_roundness_ellipse=avg_roundness,
         avg_malinowska_factor=avg_malinowska,
+        inference_time_ms=inference_time_ms,
+        total_execution_time_ms=total_execution_time_ms,
+        t_preprocess_ms=perf_stats.get("t_preprocess_ms"),
+        t_segment_ms=perf_stats.get("t_segment_ms"),
+        t_morphology_ms=perf_stats.get("t_morphology_ms"),
+        t_stereology_ms=perf_stats.get("t_stereology_ms"),
+        t_encoding_ms=perf_stats.get("t_encoding_ms"),
     )
+

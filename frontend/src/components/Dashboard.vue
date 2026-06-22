@@ -199,7 +199,7 @@
           :scale-enabled="workflow.scalePxLength > 0"
           :scale-line-coords="workflow.scaleLineCoords"
           :scale-drawing="scaleDrawing"
-          :scale-physical-value="workflow.scalePhysicalValue"
+          :scale-physical-value="Number(workflow.scalePhysicalValue) || 0"
           :scale-unit="workflow.scaleUnit"
           :scale-px-length="workflow.scalePxLength"
           :image-natural="imageNatural"
@@ -249,7 +249,15 @@
           :avg-shape-factor-raw="displayShape"
           :avg-roundness-ellipse="displayRoundness"
           :avg-malinowska-factor="displayMalinowska"
+          :inference-time-ms="displayInferenceTime"
+          :total-execution-time-ms="displayTotalExecutionTime"
+          :t-preprocess-ms="displayPreprocessTime"
+          :t-segment-ms="displaySegmentTime"
+          :t-morphology-ms="displayMorphologyTime"
+          :t-stereology-ms="displayStereologyTime"
+          :t-encoding-ms="displayEncodingTime"
           :is-thinner="histogramThinner"
+
           :is-threshold-editable="isThresholdEditable"
           :images-count="images.length"
           :show-averages="showAverages"
@@ -405,7 +413,7 @@ const params = reactive({
   denoise_enabled: true,
   denoise_method: 'median',
   denoise_kernel_size: 5,
-  binarization_method: 'otsu',
+  binarization_method: 'ml',
   manual_threshold: 120,
   ml_model_name: 'unet_resnet18_baseline',
   morph_open_iterations: 1,
@@ -463,6 +471,36 @@ const displayMalinowska = computed(() => {
   if (showAverages.value && images.value.length > 1) return workflow.avgMalinowskaFactor
   return result.value ? (images.value[activeImageIndex.value]?.shapeFactors?.avgMalinowskaFactor ?? null) : null
 })
+const displayInferenceTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgInferenceTimeMs
+  return result.value?.inference_time_ms ?? null
+})
+const displayTotalExecutionTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgTotalExecutionTimeMs
+  return result.value?.total_execution_time_ms ?? null
+})
+const displayPreprocessTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgPreprocessMs
+  return result.value?.t_preprocess_ms ?? null
+})
+const displaySegmentTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgSegmentMs
+  return result.value?.t_segment_ms ?? null
+})
+const displayMorphologyTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgMorphologyMs
+  return result.value?.t_morphology_ms ?? null
+})
+const displayStereologyTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgStereologyMs
+  return result.value?.t_stereology_ms ?? null
+})
+const displayEncodingTime = computed(() => {
+  if (showAverages.value && images.value.length > 1) return workflow.avgEncodingMs
+  return result.value?.t_encoding_ms ?? null
+})
+
+
 
 const displayedRoiBox = computed(() => {
   if (!params.roi || !imageNatural.width || !imageNatural.height || !imageRender.width || !imageRender.height) return null
@@ -661,7 +699,7 @@ async function addFiles(filesList) {
       denoise_enabled: true,
       denoise_method: 'median',
       denoise_kernel_size: 5,
-      binarization_method: 'otsu',
+      binarization_method: 'ml',
       manual_threshold: 120,
       ml_model_name: 'unet_resnet18_baseline',
       morph_open_iterations: 1,
@@ -724,9 +762,18 @@ function setActiveImage(index) {
   workflow.scaleUnit = img.scaleUnit
   workflow.scaleLineCoords = img.scaleLineCoords ? { ...img.scaleLineCoords } : null
   workflow.measureLineCoords = img.measureLineCoords ? { ...img.measureLineCoords } : null
+  workflow.inferenceTimeMs = img.result?.inference_time_ms ?? null
+  workflow.totalExecutionTimeMs = img.result?.total_execution_time_ms ?? null
+  workflow.tPreprocessMs = img.result?.t_preprocess_ms ?? null
+  workflow.tSegmentMs = img.result?.t_segment_ms ?? null
+  workflow.tMorphologyMs = img.result?.t_morphology_ms ?? null
+  workflow.tStereologyMs = img.result?.t_stereology_ms ?? null
+  workflow.tEncodingMs = img.result?.t_encoding_ms ?? null
 
   resetView()
+
   isSwapped.value = false
+
 }
 
 // Delete an image from list
@@ -754,7 +801,7 @@ function deleteImage(index) {
       denoise_enabled: true,
       denoise_method: 'median',
       denoise_kernel_size: 5,
-      binarization_method: 'otsu',
+      binarization_method: 'ml',
       manual_threshold: 120,
       ml_model_name: 'unet_resnet18_baseline',
       morph_open_iterations: 1,
@@ -1698,7 +1745,15 @@ async function runAnalysis() {
 
     // Save result of the currently active image
     if (activeImageIndex.value >= 0 && activeImageIndex.value < images.value.length) {
-      result.value = images.value[activeImageIndex.value].result
+      const activeRes = images.value[activeImageIndex.value].result
+      result.value = activeRes
+      workflow.inferenceTimeMs = activeRes?.inference_time_ms ?? null
+      workflow.totalExecutionTimeMs = activeRes?.total_execution_time_ms ?? null
+      workflow.tPreprocessMs = activeRes?.t_preprocess_ms ?? null
+      workflow.tSegmentMs = activeRes?.t_segment_ms ?? null
+      workflow.tMorphologyMs = activeRes?.t_morphology_ms ?? null
+      workflow.tStereologyMs = activeRes?.t_stereology_ms ?? null
+      workflow.tEncodingMs = activeRes?.t_encoding_ms ?? null
     }
 
     computeAverageMetrics(results)
@@ -1718,12 +1773,46 @@ function computeAverageMetrics(results) {
   let totalAa = 0, totalPoreCount = 0
   let totalRoiArea = 0, totalAvgPoreArea = 0, totalNa = 0
   let totalD1 = 0, totalD2 = 0, totalEdge = 0, totalShape = 0, totalRoundness = 0, totalMalinowska = 0
+  let totalInference = 0, totalTotalTime = 0
+  let totalPreprocess = 0, totalSegment = 0, totalMorphology = 0, totalStereology = 0, totalEncoding = 0
+  let mlCount = 0
+  let timeCount = 0
+  let prepCount = 0, segCount = 0, morphCount = 0, stereologyCount = 0, encodingCount = 0
 
   let scaleCount = 0
   results.forEach(res => {
     totalAa += res.aa_percent
     totalPoreCount += res.pore_count
     
+    if (res.inference_time_ms !== null && res.inference_time_ms !== undefined) {
+      totalInference += res.inference_time_ms
+      mlCount++
+    }
+    if (res.total_execution_time_ms !== null && res.total_execution_time_ms !== undefined) {
+      totalTotalTime += res.total_execution_time_ms
+      timeCount++
+    }
+    if (res.t_preprocess_ms !== null && res.t_preprocess_ms !== undefined) {
+      totalPreprocess += res.t_preprocess_ms
+      prepCount++
+    }
+    if (res.t_segment_ms !== null && res.t_segment_ms !== undefined) {
+      totalSegment += res.t_segment_ms
+      segCount++
+    }
+    if (res.t_morphology_ms !== null && res.t_morphology_ms !== undefined) {
+      totalMorphology += res.t_morphology_ms
+      morphCount++
+    }
+    if (res.t_stereology_ms !== null && res.t_stereology_ms !== undefined) {
+      totalStereology += res.t_stereology_ms
+      stereologyCount++
+    }
+    if (res.t_encoding_ms !== null && res.t_encoding_ms !== undefined) {
+      totalEncoding += res.t_encoding_ms
+      encodingCount++
+    }
+
     if (res.total_roi_area_physical !== null && res.total_roi_area_physical !== undefined) {
       totalRoiArea += res.total_roi_area_physical
       totalAvgPoreArea += res.average_pore_area_physical || 0
@@ -1744,6 +1833,15 @@ function computeAverageMetrics(results) {
   workflow.avgEdgeIndicator = totalEdge / count
   workflow.avgRoundnessEllipse = totalRoundness / count
   workflow.avgMalinowskaFactor = totalMalinowska / count
+  workflow.avgInferenceTimeMs = mlCount > 0 ? totalInference / mlCount : null
+  workflow.avgTotalExecutionTimeMs = timeCount > 0 ? totalTotalTime / timeCount : null
+  workflow.avgPreprocessMs = prepCount > 0 ? totalPreprocess / prepCount : null
+  workflow.avgSegmentMs = segCount > 0 ? totalSegment / segCount : null
+  workflow.avgMorphologyMs = morphCount > 0 ? totalMorphology / morphCount : null
+  workflow.avgStereologyMs = stereologyCount > 0 ? totalStereology / stereologyCount : null
+  workflow.avgEncodingMs = encodingCount > 0 ? totalEncoding / encodingCount : null
+
+
 
   if (scaleCount > 0) {
     workflow.avgTotalRoiArea = totalRoiArea / scaleCount

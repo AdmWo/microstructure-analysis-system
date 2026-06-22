@@ -44,18 +44,18 @@ def apply_denoise(gray: np.ndarray, params: AnalysisParams) -> np.ndarray:
     return cv2.medianBlur(gray, kernel)
 
 
-def binarize(gray: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, int | None]:
+def binarize(gray: np.ndarray, params: AnalysisParams) -> tuple[np.ndarray, int | None, float | None]:
     """Segment pores as white in mask using Otsu, manual threshold, or ML model."""
     if params.binarization_method == "manual":
         _, mask = cv2.threshold(gray, params.manual_threshold, 255, cv2.THRESH_BINARY_INV)
-        return mask, params.manual_threshold
+        return mask, params.manual_threshold, None
 
     if params.binarization_method == "ml":
-        mask = model_manager.segment(params.ml_model_name, gray)
-        return mask, None
+        mask, inference_time_ms = model_manager.segment(params.ml_model_name, gray)
+        return mask, None, inference_time_ms
 
     thresh_val, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    return mask, int(thresh_val)
+    return mask, int(thresh_val), None
 
 
 def morphological_cleanup(mask: np.ndarray, params: AnalysisParams) -> np.ndarray:
@@ -209,11 +209,13 @@ def encode_image_b64(img: np.ndarray, fmt: str = ".png") -> str:
     return base64.b64encode(buf.tobytes()).decode("utf-8")
 
 
-def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[
+def run_workflow(img: np.ndarray, params: AnalysisParams, perf_stats: dict | None = None) -> tuple[
     np.ndarray, np.ndarray, int, float, float, int | None, float | None, float | None, float | None,
-    float | None, float | None, float | None, float | None, float | None, float | None
+    float | None, float | None, float | None, float | None, float | None, float | None, float | None
 ]:
     """Execute the staged scientific workflow and return ROI/mask/stats."""
+    import time
+    t0 = time.perf_counter()
     roi_img = crop_roi(img, params.roi)
     if params.invert_roi:
         roi_img = cv2.bitwise_not(roi_img)
@@ -223,26 +225,40 @@ def run_workflow(img: np.ndarray, params: AnalysisParams) -> tuple[
     gray_f = (gray_f - 128.0) * alpha + 128.0
     gray = np.clip(gray_f, 0, 255).astype(np.uint8)
     preprocessed = apply_denoise(gray, params)
+    t1 = time.perf_counter()
+    if perf_stats is not None:
+        perf_stats["t_preprocess_ms"] = (t1 - t0) * 1000.0
 
+    inference_time_ms = None
     if params.stage >= 2:
-        segmented, thresh_val = binarize(preprocessed, params)
+        segmented, thresh_val, inference_time_ms = binarize(preprocessed, params)
     else:
         segmented = np.zeros_like(preprocessed, dtype=np.uint8)
         thresh_val = params.manual_threshold
+    t2 = time.perf_counter()
+    if perf_stats is not None:
+        perf_stats["t_segment_ms"] = (t2 - t1) * 1000.0
 
     if params.stage >= 3:
         cleaned_mask = morphological_cleanup(segmented, params)
     else:
         cleaned_mask = segmented
+    t3 = time.perf_counter()
+    if perf_stats is not None:
+        perf_stats["t_morphology_ms"] = (t3 - t2) * 1000.0
 
     (
         pore_count, aa_percent, vv_percent, 
         total_roi_area_physical, average_pore_area_physical, n_a,
         avg_d1, avg_d2, avg_edge, avg_shape_factor, avg_roundness, avg_malinowska
     ) = stereology_stats(cleaned_mask, params)
+    t4 = time.perf_counter()
+    if perf_stats is not None:
+        perf_stats["t_stereology_ms"] = (t4 - t3) * 1000.0
     
     return (
         roi_img, cleaned_mask, pore_count, aa_percent, vv_percent, thresh_val, 
         total_roi_area_physical, average_pore_area_physical, n_a,
-        avg_d1, avg_d2, avg_edge, avg_shape_factor, avg_roundness, avg_malinowska
+        avg_d1, avg_d2, avg_edge, avg_shape_factor, avg_roundness, avg_malinowska,
+        inference_time_ms
     )

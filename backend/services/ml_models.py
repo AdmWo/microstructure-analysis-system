@@ -1,4 +1,5 @@
 import os
+import time
 import cv2
 import numpy as np
 
@@ -49,7 +50,7 @@ class MicrostructureModelManager:
             print(f"Error loading ONNX model '{model_name}': {e}", flush=True)
             return None
 
-    def segment(self, model_name: str, roi_gray: np.ndarray) -> np.ndarray:
+    def segment(self, model_name: str, roi_gray: np.ndarray) -> tuple[np.ndarray, float | None]:
         """Perform semantic segmentation on a grayscale ROI image."""
         orig_h, orig_w = roi_gray.shape[:2]
 
@@ -70,8 +71,11 @@ class MicrostructureModelManager:
             try:
                 # Get input name from the model
                 input_name = session.get_inputs()[0].name
-                # Run model inference
+                # Run model inference and measure exact execution time
+                start_time = time.perf_counter()
                 outputs = session.run(None, {input_name: input_tensor})
+                inference_time_ms = (time.perf_counter() - start_time) * 1000.0
+                
                 # Outputs is list of outputs, assume first output is predictions/probability map
                 prob_map = outputs[0]  # Shape: (1, 1, 256, 256) or similar
                 # Remove batch/channel dimensions
@@ -82,7 +86,7 @@ class MicrostructureModelManager:
                 prob_orig = cv2.resize(prob_map, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
                 # Apply probability threshold (> 0.5) at the original resolution
                 final_mask = (prob_orig > 0.5).astype(np.uint8) * 255
-                return final_mask
+                return final_mask, inference_time_ms
             except Exception as e:
                 # If inference fails, log it and fall back to dummy binarization
                 print(f"Error running ONNX inference: {e}", flush=True)
@@ -93,7 +97,8 @@ class MicrostructureModelManager:
 
         # 6. Resize the binary fallback mask back to original ROI size using nearest neighbor
         final_mask = cv2.resize(binary_256, (orig_w, orig_h), interpolation=cv2.INTER_NEAREST)
-        return final_mask
+        return final_mask, None
+
 
     def _dummy_binarize(self, resized_gray: np.ndarray) -> np.ndarray:
         """Baseline fallback (Otsu binarization) to ensure pipeline runs without crashes."""
